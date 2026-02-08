@@ -1,0 +1,669 @@
+"""
+Arboric CLI
+
+The command-line interface for Arboric - intelligent workload scheduling
+for cost and carbon optimization. Built with Typer and Rich for a
+polished, investor-ready demo experience.
+"""
+
+import time
+from datetime import datetime
+from typing import Optional
+
+import typer
+from rich import box
+from rich.align import Align
+from rich.console import Console, Group
+from rich.live import Live
+from rich.panel import Panel
+from rich.progress import (
+    BarColumn,
+    Progress,
+    SpinnerColumn,
+    TaskProgressColumn,
+    TextColumn,
+    TimeElapsedColumn,
+)
+from rich.style import Style
+from rich.table import Table
+from rich.text import Text
+
+from arboric.autopilot import Autopilot, OptimizationConfig
+from arboric.grid_oracle import MockGrid
+from arboric.models import Workload, WorkloadType
+
+# Initialize Rich console
+console = Console()
+
+# Initialize Typer app
+app = typer.Typer(
+    name="arboric",
+    help="Intelligent autopilot for cloud infrastructure. Harvest optimal energy windows.",
+    add_completion=False,
+    rich_markup_mode="rich",
+)
+
+# Brand colors
+ARBORIC_GREEN = "#22c55e"
+ARBORIC_BLUE = "#3b82f6"
+ARBORIC_AMBER = "#f59e0b"
+ARBORIC_RED = "#ef4444"
+ARBORIC_PURPLE = "#8b5cf6"
+
+
+def print_banner():
+    """Display the Arboric ASCII banner."""
+    banner = """
+    ╔═══════════════════════════════════════════════════════════════╗
+    ║                                                               ║
+    ║     █████╗ ██████╗ ██████╗  ██████╗ ██████╗ ██╗ ██████╗      ║
+    ║    ██╔══██╗██╔══██╗██╔══██╗██╔═══██╗██╔══██╗██║██╔════╝      ║
+    ║    ███████║██████╔╝██████╔╝██║   ██║██████╔╝██║██║           ║
+    ║    ██╔══██║██╔══██╗██╔══██╗██║   ██║██╔══██╗██║██║           ║
+    ║    ██║  ██║██║  ██║██████╔╝╚██████╔╝██║  ██║██║╚██████╗      ║
+    ║    ╚═╝  ╚═╝╚═╝  ╚═╝╚═════╝  ╚═════╝ ╚═╝  ╚═╝╚═╝ ╚═════╝      ║
+    ║                                                               ║
+    ║           Intelligent Autopilot for Cloud Infrastructure      ║
+    ║                  Harvest Optimal Energy Windows               ║
+    ╚═══════════════════════════════════════════════════════════════╝
+    """
+    console.print(banner, style=f"bold {ARBORIC_GREEN}")
+
+
+def create_comparison_table(result) -> Table:
+    """Create a visual comparison table for optimization results."""
+    table = Table(
+        title="",
+        box=box.ROUNDED,
+        show_header=True,
+        header_style=f"bold {ARBORIC_BLUE}",
+        border_style=ARBORIC_BLUE,
+        padding=(0, 1),
+    )
+
+    table.add_column("Metric", style="bold white", width=20)
+    table.add_column("Immediate Run", style=f"bold {ARBORIC_RED}", justify="right", width=18)
+    table.add_column("Arboric Schedule", style=f"bold {ARBORIC_GREEN}", justify="right", width=18)
+    table.add_column("Yield", style=f"bold {ARBORIC_AMBER}", justify="right", width=14)
+
+    # Start time
+    table.add_row(
+        "Start Time",
+        result.baseline_start.strftime("%H:%M"),
+        result.optimal_start.strftime("%H:%M"),
+        f"+{result.delay_hours:.1f}h delay" if result.delay_hours > 0 else "Immediate",
+    )
+
+    # Avg Price
+    table.add_row(
+        "Avg Price",
+        f"${result.baseline_avg_price:.4f}/kWh",
+        f"${result.optimized_avg_price:.4f}/kWh",
+        f"{((result.baseline_avg_price - result.optimized_avg_price) / result.baseline_avg_price * 100):+.1f}%",
+    )
+
+    # Avg Carbon
+    table.add_row(
+        "Avg Carbon",
+        f"{result.baseline_avg_carbon:.0f} gCO2/kWh",
+        f"{result.optimized_avg_carbon:.0f} gCO2/kWh",
+        f"{((result.baseline_avg_carbon - result.optimized_avg_carbon) / result.baseline_avg_carbon * 100):+.1f}%",
+    )
+
+    table.add_section()
+
+    # Total Cost
+    table.add_row(
+        "Total Cost",
+        f"${result.baseline_cost:.2f}",
+        f"${result.optimized_cost:.2f}",
+        f"-${result.cost_savings:.2f}",
+    )
+
+    # Total Carbon
+    table.add_row(
+        "Total Carbon",
+        f"{result.baseline_carbon_kg:.2f} kg",
+        f"{result.optimized_carbon_kg:.2f} kg",
+        f"-{result.carbon_savings_kg:.2f} kg",
+    )
+
+    return table
+
+
+def create_forecast_chart(forecast_df, optimal_start, workload_duration) -> str:
+    """Create an ASCII visualization of the forecast with scheduled window."""
+    hours = min(24, len(forecast_df))
+    chart_width = 60
+
+    # Normalize values for display
+    prices = forecast_df['price'].head(hours).values
+    carbons = forecast_df['co2_intensity'].head(hours).values
+
+    price_min, price_max = prices.min(), prices.max()
+    carbon_min, carbon_max = carbons.min(), carbons.max()
+
+    def normalize(val, vmin, vmax, height=8):
+        if vmax == vmin:
+            return height // 2
+        return int((val - vmin) / (vmax - vmin) * (height - 1))
+
+    # Build chart
+    lines = []
+    height = 8
+
+    # Price chart
+    lines.append(f"  {'Price ($/kWh)':<20} │ ${price_max:.3f}")
+    for row in range(height - 1, -1, -1):
+        line = "  " + " " * 20 + " │ "
+        for i, price in enumerate(prices):
+            h = normalize(price, price_min, price_max, height)
+            if h >= row:
+                # Check if this hour is in the optimal window
+                hour_ts = forecast_df.index[i]
+                if hour_ts >= optimal_start and (hour_ts - optimal_start).total_seconds() / 3600 < workload_duration:
+                    line += "█"  # Scheduled window
+                else:
+                    line += "▒"
+            else:
+                line += " "
+        lines.append(line)
+    lines.append(f"  {'':20} │ ${price_min:.3f}")
+    lines.append(f"  {'':20} └{'─' * hours}")
+
+    # Hour labels
+    hour_labels = "  " + " " * 21
+    for i in range(0, hours, 4):
+        ts = forecast_df.index[i]
+        hour_labels += f"{ts.hour:02d}  "
+    lines.append(hour_labels + " (hour)")
+
+    return "\n".join(lines)
+
+
+def simulate_optimization_animation(workload_name: str, duration: float = 1.5):
+    """Display animated optimization process."""
+    steps = [
+        ("Connecting to Grid Oracle...", 0.2),
+        ("Fetching 24h forecast data...", 0.3),
+        ("Analyzing carbon intensity patterns...", 0.2),
+        ("Scanning for price anomalies...", 0.2),
+        ("Detecting solar duck curve...", 0.15),
+        ("Evaluating feasible windows...", 0.2),
+        ("Computing optimal trajectory...", 0.25),
+    ]
+
+    with Progress(
+        SpinnerColumn(spinner_name="dots", style=ARBORIC_GREEN),
+        TextColumn("[bold white]{task.description}"),
+        BarColumn(bar_width=30, complete_style=ARBORIC_GREEN),
+        TaskProgressColumn(),
+        console=console,
+    ) as progress:
+        task = progress.add_task(f"[{ARBORIC_BLUE}]Optimizing {workload_name}...", total=len(steps))
+
+        for step_text, step_time in steps:
+            progress.update(task, description=f"[white]{step_text}")
+            time.sleep(step_time * (duration / 1.5))
+            progress.advance(task)
+
+
+@app.command()
+def optimize(
+    workload_name: str = typer.Argument(..., help="Name of the workload to optimize"),
+    duration: float = typer.Option(4.0, "--duration", "-d", help="Workload duration in hours"),
+    deadline: float = typer.Option(12.0, "--deadline", "-D", help="Must complete within hours"),
+    power: float = typer.Option(50.0, "--power", "-p", help="Power draw in kW"),
+    region: str = typer.Option("US-WEST", "--region", "-r", help="Grid region"),
+    quiet: bool = typer.Option(False, "--quiet", "-q", help="Minimal output"),
+):
+    """
+    Optimize a single workload for cost and carbon efficiency.
+
+    Example: arboric optimize "LLM Training" --duration 6 --deadline 24
+    """
+    if not quiet:
+        print_banner()
+        console.print()
+
+    # Create workload
+    workload = Workload(
+        name=workload_name,
+        duration_hours=duration,
+        power_draw_kw=power,
+        deadline_hours=deadline,
+        workload_type=WorkloadType.ML_TRAINING,
+    )
+
+    # Display workload info
+    workload_panel = Panel(
+        f"""[bold]Workload:[/bold] {workload.name}
+[bold]Duration:[/bold] {workload.duration_hours}h
+[bold]Power Draw:[/bold] {workload.power_draw_kw} kW
+[bold]Energy:[/bold] {workload.energy_kwh} kWh
+[bold]Deadline:[/bold] {workload.deadline_hours}h from now
+[bold]Region:[/bold] {region}""",
+        title="[bold white]Payload Configuration",
+        border_style=ARBORIC_PURPLE,
+        padding=(1, 2),
+    )
+    console.print(workload_panel)
+    console.print()
+
+    # Simulate optimization
+    if not quiet:
+        simulate_optimization_animation(workload_name)
+        console.print()
+
+    # Get forecast and optimize
+    grid = MockGrid(region=region)
+    forecast = grid.get_forecast(hours=int(deadline) + int(duration) + 2)
+
+    autopilot = Autopilot()
+    result = autopilot.optimize_schedule(workload, forecast)
+
+    # Display events
+    events = grid.detect_events(forecast)
+    if events and not quiet:
+        console.print(f"[bold {ARBORIC_AMBER}]Grid Events Detected:[/bold {ARBORIC_AMBER}]")
+        for event in events:
+            icon = "⚠️ " if event["severity"] == "warning" else "✨ "
+            color = ARBORIC_AMBER if event["severity"] == "warning" else ARBORIC_GREEN
+            console.print(f"  {icon}[{color}]{event['description']}[/{color}]")
+        console.print()
+
+    # Show optimization decision
+    if result.delay_hours > 0:
+        console.print(
+            f"[bold {ARBORIC_GREEN}]Rerouting payload to "
+            f"{result.optimal_start.strftime('%H:%M')} "
+            f"({result.delay_hours:.1f}h delay)[/bold {ARBORIC_GREEN}]"
+        )
+    else:
+        console.print(f"[bold {ARBORIC_GREEN}]Optimal window is NOW - executing immediately[/bold {ARBORIC_GREEN}]")
+    console.print()
+
+    # Show comparison table
+    table = create_comparison_table(result)
+    console.print(Panel(table, title="[bold]Optimization Analysis", border_style=ARBORIC_BLUE))
+    console.print()
+
+    # Show yield summary
+    yield_panel = Panel(
+        Align.center(
+            Text.from_markup(
+                f"[bold {ARBORIC_GREEN}]TOTAL YIELD[/bold {ARBORIC_GREEN}]\n\n"
+                f"[bold white]💰 ${result.cost_savings:.2f} saved[/bold white]  ·  "
+                f"[bold white]🌱 {result.carbon_savings_kg:.2f} kg CO₂ avoided[/bold white]\n\n"
+                f"[dim]Cost reduction: {result.cost_savings_percent:.1f}% | "
+                f"Carbon reduction: {result.carbon_savings_percent:.1f}%[/dim]"
+            )
+        ),
+        border_style=ARBORIC_GREEN,
+        padding=(1, 2),
+    )
+    console.print(yield_panel)
+
+
+@app.command()
+def demo():
+    """
+    Run the Arboric Autopilot demo with multiple AI workloads.
+
+    Simulates scheduling 5 heavy AI training jobs and shows
+    the aggregated impact of intelligent scheduling.
+    """
+    print_banner()
+    console.print()
+
+    # Demo workloads (realistic AI/data pipeline jobs)
+    demo_workloads = [
+        Workload(
+            name="LLM Fine-tuning (GPT-4 class)",
+            duration_hours=8,
+            power_draw_kw=120,
+            deadline_hours=24,
+            workload_type=WorkloadType.ML_TRAINING,
+        ),
+        Workload(
+            name="Daily ETL Pipeline",
+            duration_hours=2,
+            power_draw_kw=40,
+            deadline_hours=12,
+            workload_type=WorkloadType.ETL_PIPELINE,
+        ),
+        Workload(
+            name="Vision Model Training",
+            duration_hours=6,
+            power_draw_kw=80,
+            deadline_hours=18,
+            workload_type=WorkloadType.ML_TRAINING,
+        ),
+        Workload(
+            name="Embedding Generation",
+            duration_hours=4,
+            power_draw_kw=60,
+            deadline_hours=16,
+            workload_type=WorkloadType.BATCH_PROCESSING,
+        ),
+        Workload(
+            name="Data Warehouse Sync",
+            duration_hours=3,
+            power_draw_kw=35,
+            deadline_hours=8,
+            workload_type=WorkloadType.DATA_ANALYTICS,
+        ),
+    ]
+
+    # Display intro
+    intro_panel = Panel(
+        f"""[bold]Arboric Autopilot Demo[/bold]
+
+Simulating intelligent scheduling for [bold]{len(demo_workloads)}[/bold] heavy compute workloads.
+The autopilot will analyze grid conditions and optimize each job for
+minimum cost and carbon emissions.
+
+[dim]Region: US-WEST  |  Forecast Horizon: 24h  |  Optimization: 70% cost / 30% carbon[/dim]""",
+        border_style=ARBORIC_PURPLE,
+        padding=(1, 2),
+    )
+    console.print(intro_panel)
+    console.print()
+
+    # Show workload queue
+    queue_table = Table(
+        title="[bold]Workload Queue",
+        box=box.ROUNDED,
+        border_style=ARBORIC_BLUE,
+        header_style=f"bold {ARBORIC_BLUE}",
+    )
+    queue_table.add_column("#", style="dim", width=3)
+    queue_table.add_column("Workload", style="white", width=30)
+    queue_table.add_column("Duration", justify="right", width=10)
+    queue_table.add_column("Power", justify="right", width=10)
+    queue_table.add_column("Energy", justify="right", width=12)
+    queue_table.add_column("Deadline", justify="right", width=10)
+
+    for i, w in enumerate(demo_workloads, 1):
+        queue_table.add_row(
+            str(i),
+            w.name,
+            f"{w.duration_hours}h",
+            f"{w.power_draw_kw} kW",
+            f"{w.energy_kwh} kWh",
+            f"{w.deadline_hours}h",
+        )
+
+    console.print(queue_table)
+    console.print()
+
+    # Initialize grid and autopilot
+    grid = MockGrid(region="US-WEST")
+    forecast = grid.get_forecast(hours=48)  # Extended forecast
+    autopilot = Autopilot()
+
+    # Process each workload with live updates
+    results = []
+
+    console.print(f"[bold {ARBORIC_GREEN}]Engaging Autopilot...[/bold {ARBORIC_GREEN}]")
+    console.print()
+
+    with Progress(
+        SpinnerColumn(spinner_name="dots", style=ARBORIC_GREEN),
+        TextColumn("[bold white]{task.description}"),
+        BarColumn(bar_width=40, complete_style=ARBORIC_GREEN, finished_style=ARBORIC_GREEN),
+        TaskProgressColumn(),
+        TimeElapsedColumn(),
+        console=console,
+    ) as progress:
+        main_task = progress.add_task(
+            "[white]Processing workload queue...",
+            total=len(demo_workloads),
+        )
+
+        for workload in demo_workloads:
+            progress.update(main_task, description=f"[white]Optimizing: {workload.name}")
+
+            # Simulate processing time
+            time.sleep(0.8)
+
+            # Get optimization result
+            result = autopilot.optimize_schedule(workload, forecast)
+            results.append(result)
+
+            progress.advance(main_task)
+
+    console.print()
+
+    # Show results table
+    results_table = Table(
+        title="[bold]Optimization Results",
+        box=box.ROUNDED,
+        border_style=ARBORIC_GREEN,
+        header_style=f"bold {ARBORIC_GREEN}",
+    )
+    results_table.add_column("Workload", style="white", width=28)
+    results_table.add_column("Scheduled", justify="center", width=12)
+    results_table.add_column("Delay", justify="right", width=8)
+    results_table.add_column("Cost Saved", justify="right", width=12)
+    results_table.add_column("CO₂ Saved", justify="right", width=12, style=ARBORIC_GREEN)
+
+    total_cost_saved = 0
+    total_carbon_saved = 0
+
+    for r in results:
+        delay_str = f"+{r.delay_hours:.1f}h" if r.delay_hours > 0 else "Now"
+        # Conditional coloring: green if positive savings, amber/yellow if negative
+        cost_color = ARBORIC_GREEN if r.cost_savings >= 0 else ARBORIC_AMBER
+        cost_display = f"[{cost_color}]${r.cost_savings:.2f}[/{cost_color}]"
+
+        results_table.add_row(
+            r.workload.name[:27],
+            r.optimal_start.strftime("%H:%M"),
+            delay_str,
+            cost_display,
+            f"{r.carbon_savings_kg:.2f} kg",
+        )
+        total_cost_saved += r.cost_savings
+        total_carbon_saved += r.carbon_savings_kg
+
+    # Add totals row with conditional coloring
+    total_cost_color = ARBORIC_GREEN if total_cost_saved >= 0 else ARBORIC_AMBER
+    results_table.add_section()
+    results_table.add_row(
+        "[bold]TOTAL",
+        "",
+        "",
+        f"[bold {total_cost_color}]${total_cost_saved:.2f}[/bold {total_cost_color}]",
+        f"[bold]{total_carbon_saved:.2f} kg",
+    )
+
+    console.print(results_table)
+    console.print()
+
+    # Calculate fleet statistics
+    total_baseline_cost = sum(r.baseline_cost for r in results)
+    total_optimized_cost = sum(r.optimized_cost for r in results)
+    total_baseline_carbon = sum(r.baseline_carbon_kg for r in results)
+    total_optimized_carbon = sum(r.optimized_carbon_kg for r in results)
+
+    cost_reduction_pct = (total_cost_saved / total_baseline_cost * 100) if total_baseline_cost > 0 else 0
+    carbon_reduction_pct = (total_carbon_saved / total_baseline_carbon * 100) if total_baseline_carbon > 0 else 0
+
+    # Annualized projections (assuming daily runs)
+    annual_cost_savings = total_cost_saved * 365
+    annual_carbon_savings = total_carbon_saved * 365
+
+    # Conditional coloring for cost savings
+    cost_savings_color = ARBORIC_GREEN if total_cost_saved >= 0 else ARBORIC_AMBER
+    cost_savings_label = "SAVINGS" if total_cost_saved >= 0 else "COST"
+
+    # Final impact panel
+    impact_text = f"""
+[bold {ARBORIC_GREEN}]                    ARBORIC IMPACT REPORT                    [/bold {ARBORIC_GREEN}]
+
+┌─────────────────────────────────────────────────────────────┐
+│                                                             │
+│   [bold]Fleet Optimization Summary[/bold]                             │
+│                                                             │
+│   Workloads Processed:  [bold]{len(demo_workloads)}[/bold]                                │
+│   Total Energy:         [bold]{sum(w.energy_kwh for w in demo_workloads):,.0f} kWh[/bold]                          │
+│                                                             │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│   [bold {ARBORIC_RED}]Without Arboric[/bold {ARBORIC_RED}]          [bold {ARBORIC_GREEN}]With Arboric[/bold {ARBORIC_GREEN}]               │
+│   ─────────────────      ─────────────────               │
+│   Cost:    ${total_baseline_cost:>8,.2f}        Cost:    ${total_optimized_cost:>8,.2f}             │
+│   Carbon:  {total_baseline_carbon:>8,.2f} kg      Carbon:  {total_optimized_carbon:>8,.2f} kg           │
+│                                                             │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│   [bold {cost_savings_color}]💰 COST {cost_savings_label}:      ${abs(total_cost_saved):>8,.2f}  ({abs(cost_reduction_pct):.1f}% {"saved" if total_cost_saved >= 0 else "increase"})[/bold {cost_savings_color}]   │
+│   [bold {ARBORIC_GREEN}]🌱 CARBON AVOIDED:    {total_carbon_saved:>8,.2f} kg ({carbon_reduction_pct:.1f}% reduction)[/bold {ARBORIC_GREEN}]   │
+│                                                             │
+└─────────────────────────────────────────────────────────────┘
+
+[bold {cost_savings_color}]═══════════════════════════════════════════════════════════════[/bold {cost_savings_color}]
+[bold {cost_savings_color}]  💵 ANNUALIZED SAVINGS: ${abs(annual_cost_savings):>,.0f}/year {"" if total_cost_saved >= 0 else "(projected cost increase)"}[/bold {cost_savings_color}]
+[bold {cost_savings_color}]═══════════════════════════════════════════════════════════════[/bold {cost_savings_color}]
+
+[dim]Plus: 🌲 {annual_carbon_savings/1000:,.1f} metric tons CO₂ avoided per year[/dim]
+"""
+
+    console.print(Panel(
+        impact_text,
+        border_style=ARBORIC_GREEN,
+        padding=(0, 1),
+    ))
+
+    # Closing message
+    console.print()
+    console.print(
+        f"[dim]Arboric: Where algorithms meet sustainability.[/dim]",
+        justify="center",
+    )
+
+
+@app.command()
+def forecast(
+    region: str = typer.Option("US-WEST", "--region", "-r", help="Grid region"),
+    hours: int = typer.Option(24, "--hours", "-h", help="Forecast hours"),
+):
+    """
+    Display the current grid forecast for a region.
+
+    Shows carbon intensity and pricing over the forecast horizon.
+    """
+    print_banner()
+    console.print()
+
+    console.print(f"[bold]Fetching {hours}h forecast for {region}...[/bold]")
+    console.print()
+
+    grid = MockGrid(region=region)
+    forecast_df = grid.get_forecast(hours=hours)
+
+    # Create forecast table
+    table = Table(
+        title=f"[bold]Grid Forecast: {region}",
+        box=box.ROUNDED,
+        border_style=ARBORIC_BLUE,
+        header_style=f"bold {ARBORIC_BLUE}",
+    )
+    table.add_column("Time", style="white", width=8)
+    table.add_column("Price", justify="right", width=12)
+    table.add_column("Carbon", justify="right", width=14)
+    table.add_column("Renewable", justify="right", width=12)
+    table.add_column("Status", justify="center", width=20)
+
+    for timestamp, row in forecast_df.iterrows():
+        price_color = ARBORIC_GREEN if row['price'] < 0.10 else (ARBORIC_AMBER if row['price'] < 0.15 else ARBORIC_RED)
+        carbon_color = ARBORIC_GREEN if row['co2_intensity'] < 250 else (ARBORIC_AMBER if row['co2_intensity'] < 400 else ARBORIC_RED)
+
+        # Status indicator
+        status_parts = []
+        if row['price'] < 0.08:
+            status_parts.append("💰 CHEAP")
+        if row['co2_intensity'] < 200:
+            status_parts.append("🌱 GREEN")
+        if row['price'] > 0.18:
+            status_parts.append("⚠️  PEAK")
+        if row['co2_intensity'] > 500:
+            status_parts.append("🏭 DIRTY")
+
+        status = " ".join(status_parts) if status_parts else "─"
+
+        table.add_row(
+            timestamp.strftime("%H:%M"),
+            f"[{price_color}]${row['price']:.4f}[/{price_color}]",
+            f"[{carbon_color}]{row['co2_intensity']:.0f} gCO₂[/{carbon_color}]",
+            f"{row['renewable_percentage']:.0f}%",
+            status,
+        )
+
+    console.print(table)
+
+    # Summary stats
+    console.print()
+    console.print(f"[bold]Summary:[/bold]")
+    console.print(f"  Price range:  ${forecast_df['price'].min():.4f} - ${forecast_df['price'].max():.4f}/kWh")
+    console.print(f"  Carbon range: {forecast_df['co2_intensity'].min():.0f} - {forecast_df['co2_intensity'].max():.0f} gCO₂/kWh")
+
+    # Best windows
+    best_price_idx = forecast_df['price'].idxmin()
+    best_carbon_idx = forecast_df['co2_intensity'].idxmin()
+
+    console.print()
+    console.print(f"[bold {ARBORIC_GREEN}]Best price window:[/bold {ARBORIC_GREEN}] {best_price_idx.strftime('%H:%M')} (${forecast_df.loc[best_price_idx, 'price']:.4f}/kWh)")
+    console.print(f"[bold {ARBORIC_GREEN}]Greenest window:[/bold {ARBORIC_GREEN}] {best_carbon_idx.strftime('%H:%M')} ({forecast_df.loc[best_carbon_idx, 'co2_intensity']:.0f} gCO₂/kWh)")
+
+
+@app.command()
+def status():
+    """Display Arboric system status and configuration."""
+    print_banner()
+    console.print()
+
+    status_table = Table(
+        title="[bold]System Status",
+        box=box.ROUNDED,
+        border_style=ARBORIC_BLUE,
+    )
+    status_table.add_column("Component", style="white", width=25)
+    status_table.add_column("Status", justify="center", width=15)
+    status_table.add_column("Details", width=35)
+
+    status_table.add_row(
+        "Grid Oracle",
+        f"[{ARBORIC_GREEN}]● ONLINE[/{ARBORIC_GREEN}]",
+        "MockGrid (simulation mode)",
+    )
+    status_table.add_row(
+        "Autopilot Engine",
+        f"[{ARBORIC_GREEN}]● READY[/{ARBORIC_GREEN}]",
+        "v1.0.0 | 60/40 cost/carbon weights",
+    )
+    status_table.add_row(
+        "Supported Regions",
+        f"[{ARBORIC_GREEN}]● 4 ACTIVE[/{ARBORIC_GREEN}]",
+        "US-WEST, US-EAST, EU-WEST, NORDIC",
+    )
+    status_table.add_row(
+        "API Integration",
+        f"[{ARBORIC_AMBER}]○ SIMULATED[/{ARBORIC_AMBER}]",
+        "Ready for WattTime/ISO APIs",
+    )
+
+    console.print(status_table)
+    console.print()
+
+    console.print("[dim]Run 'arboric --help' for available commands.[/dim]")
+
+
+def main():
+    """Entry point for the CLI."""
+    app()
+
+
+if __name__ == "__main__":
+    main()

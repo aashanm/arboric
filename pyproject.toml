@@ -1,0 +1,86 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "arboric"
+version = "0.1.0"
+description = "Intelligent autopilot for cloud infrastructure - harvest optimal energy windows"
+readme = "README.md"
+license = {text = "MIT"}
+requires-python = ">=3.10"
+authors = [
+    {name = "Arboric", email = "team@arboric.dev"}
+]
+keywords = [
+    "carbon",
+    "sustainability",
+    "cloud",
+    "infrastructure",
+    "scheduling",
+    "optimization",
+    "energy",
+    "green-computing",
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "Intended Audience :: System Administrators",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: System :: Systems Administration",
+    "Topic :: Scientific/Engineering",
+    "Typing :: Typed",
+]
+dependencies = [
+    "typer>=0.9.0",
+    "rich>=13.0.0",
+    "pydantic>=2.0.0",
+    "pandas>=2.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0",
+    "pytest-cov>=4.0.0",
+    "mypy>=1.0.0",
+    "ruff>=0.1.0",
+    "pandas-stubs>=2.0.0",
+]
+
+[project.scripts]
+arboric = "arboric.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/arboric/arboric"
+Documentation = "https://docs.arboric.dev"
+Repository = "https://github.com/arboric/arboric"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["arboric*"]
+
+[tool.mypy]
+python_version = "3.10"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+plugins = ["pydantic.mypy"]
+
+[tool.ruff]
+target-version = "py310"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "W", "UP"]
+ignore = ["E501"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+addopts = "-v --cov=arboric --cov-report=term-missing"

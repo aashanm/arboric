@@ -1,0 +1,24 @@
+# Arboric - Intelligent Autopilot for Cloud Infrastructure
+# Python 3.10+ required
+
+# CLI Framework
+typer>=0.9.0
+
+# Rich terminal UI
+rich>=13.0.0
+
+# Data validation
+pydantic>=2.0.0
+
+# Time-series data handling
+pandas>=2.0.0
+
+# Type stubs (development)
+pandas-stubs>=2.0.0
+
+# Optional: For future production integrations
+# httpx>=0.25.0        # Async HTTP client for API calls
+# aiohttp>=3.9.0       # Alternative async HTTP
+# python-dotenv>=1.0.0 # Environment configuration
+# structlog>=23.0.0    # Structured logging
+# prometheus-client>=0.19.0  # Metrics export
