@@ -5,7 +5,7 @@ Tests for cycle detection, topological sorting, and dependency graph
 validation for multi-workload scheduling.
 """
 
-from uuid import UUID, uuid4
+from uuid import UUID
 
 import pytest
 
@@ -185,12 +185,6 @@ class TestDependencyGraph:
 
     def test_detect_circular_two_nodes(self):
         """A → B → A should raise CircularDependencyError."""
-        a = Workload(
-            name="Job A",
-            duration_hours=2.0,
-            power_draw_kw=30.0,
-            deadline_hours=12.0,
-        )
         b_id = UUID("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb")
 
         # Create A with dependency on B (which doesn't exist yet)

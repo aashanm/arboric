@@ -5,7 +5,6 @@ Dependency graph analysis, validation, and topological sorting
 for multi-workload scheduling with constraints.
 """
 
-from typing import Dict, List, Set
 from uuid import UUID
 
 from arboric.core.models import Workload
@@ -40,7 +39,7 @@ class DependencyGraph:
     - Graph structure validation
     """
 
-    def __init__(self, workloads: List[Workload]):
+    def __init__(self, workloads: list[Workload]):
         """
         Initialize and validate dependency graph.
 
@@ -51,9 +50,9 @@ class DependencyGraph:
             InvalidDependencyError: If dependencies reference unknown workloads
             CircularDependencyError: If circular dependencies exist
         """
-        self.workloads: Dict[UUID, Workload] = {w.id: w for w in workloads}
-        self.adjacency_list: Dict[UUID, List[UUID]] = {}
-        self.reverse_adjacency: Dict[UUID, List[UUID]] = {}
+        self.workloads: dict[UUID, Workload] = {w.id: w for w in workloads}
+        self.adjacency_list: dict[UUID, list[UUID]] = {}
+        self.reverse_adjacency: dict[UUID, list[UUID]] = {}
 
         self._build_graph()
         self._validate_graph()
@@ -88,8 +87,8 @@ class DependencyGraph:
 
     def _validate_graph(self) -> None:
         """Detect circular dependencies using DFS."""
-        visited: Set[UUID] = set()
-        rec_stack: Set[UUID] = set()
+        visited: set[UUID] = set()
+        rec_stack: set[UUID] = set()
 
         def has_cycle(node: UUID) -> bool:
             visited.add(node)
@@ -114,7 +113,7 @@ class DependencyGraph:
                         "form a directed acyclic graph (DAG)."
                     )
 
-    def topological_sort(self) -> List[UUID]:
+    def topological_sort(self) -> list[UUID]:
         """
         Return workload IDs in topologically sorted order.
 
@@ -125,16 +124,16 @@ class DependencyGraph:
             List of workload IDs in execution order
         """
         # Calculate in-degrees (number of prerequisites)
-        in_degree: Dict[UUID, int] = {
+        in_degree: dict[UUID, int] = {
             wid: len(prereqs)
             for wid, prereqs in self.adjacency_list.items()
         }
 
         # Start with workloads that have no dependencies
-        queue: List[UUID] = [
+        queue: list[UUID] = [
             wid for wid, deg in in_degree.items() if deg == 0
         ]
-        sorted_order: List[UUID] = []
+        sorted_order: list[UUID] = []
 
         while queue:
             current = queue.pop(0)
