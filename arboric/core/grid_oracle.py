@@ -248,10 +248,14 @@ class MockGrid:
             # Add slight trend drift for longer forecasts
             trend_factor = 1 + (i / intervals) * self._random.uniform(-0.05, 0.05)
 
+            # Calculate values with trend factor and ensure they stay in valid ranges
+            co2 = self._calculate_carbon_intensity(hour_of_day) * trend_factor
+            price = self._calculate_price(hour_of_day) * trend_factor
+
             window = GridWindow(
                 timestamp=timestamp,
-                co2_intensity=self._calculate_carbon_intensity(hour_of_day) * trend_factor,
-                price=self._calculate_price(hour_of_day) * trend_factor,
+                co2_intensity=max(50, min(800, co2)),  # Re-clamp after trend factor
+                price=max(0.02, min(0.50, price)),  # Re-clamp after trend factor
                 renewable_percentage=self._calculate_renewable_percentage(hour_of_day),
                 region=self.region,
                 confidence=max(0.5, 1.0 - (i / intervals) * 0.3),  # Confidence decreases with time
