@@ -124,14 +124,6 @@ arboric forecast --region US-WEST --hours 24
     └──────────────────────────────────────┘
 ```
 
-### The Solar Advantage
-
-Arboric exploits the **"duck curve"** phenomenon in solar-heavy grids:
-
-- **11am-3pm:** Solar generation peaks → prices drop, carbon plummets
-- **5pm-9pm:** Solar vanishes, demand surges → prices spike, carbon soars
-- **Result:** A 4-hour delay can cut costs by 40% and carbon by 60%
-
 ---
 
 ## 🏛️ Architecture
