@@ -401,10 +401,7 @@ class Autopilot:
 
             if dep.depends_on_completion:
                 # Must wait for prerequisite completion + delay
-                constraint_time = (
-                    prereq_schedule.optimal_end +
-                    timedelta(hours=dep.min_delay_hours)
-                )
+                constraint_time = prereq_schedule.optimal_end + timedelta(hours=dep.min_delay_hours)
                 earliest_start = max(earliest_start, constraint_time)
 
         # Check if deadline can be satisfied
@@ -468,10 +465,7 @@ class Autopilot:
             prereq_schedule = completed_schedules[dep.source_workload_id]
 
             if dep.depends_on_completion:
-                min_start = (
-                    prereq_schedule.optimal_end +
-                    timedelta(hours=dep.min_delay_hours)
-                )
+                min_start = prereq_schedule.optimal_end + timedelta(hours=dep.min_delay_hours)
 
                 if result.optimal_start < min_start:
                     raise ValueError(

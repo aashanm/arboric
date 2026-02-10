@@ -178,9 +178,7 @@ class TestDependencyGraph:
                 dependencies=[WorkloadDependency(source_workload_id=a.id)],
             )
             # Manually change ID to self (simulating configuration error)
-            workload_with_self_dep.dependencies[0].source_workload_id = (
-                workload_with_self_dep.id
-            )
+            workload_with_self_dep.dependencies[0].source_workload_id = workload_with_self_dep.id
             DependencyGraph([workload_with_self_dep])
 
     def test_detect_circular_two_nodes(self):

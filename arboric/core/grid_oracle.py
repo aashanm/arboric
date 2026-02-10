@@ -225,7 +225,9 @@ class MockGrid:
         total = base_renewable + solar + max(0, wind)
         return min(95, max(5, total + self._random.gauss(0, 3)))
 
-    def get_forecast(self, hours: int = 24, resolution_minutes: int = 60, start_time: datetime | None = None) -> pd.DataFrame:
+    def get_forecast(
+        self, hours: int = 24, resolution_minutes: int = 60, start_time: datetime | None = None
+    ) -> pd.DataFrame:
         """
         Generate a grid forecast for the specified time horizon.
 

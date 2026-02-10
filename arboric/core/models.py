@@ -46,18 +46,16 @@ class WorkloadDependency(BaseModel):
     """
 
     source_workload_id: UUID = Field(
-        ...,
-        description="UUID of the prerequisite workload that must complete first"
+        ..., description="UUID of the prerequisite workload that must complete first"
     )
     depends_on_completion: bool = Field(
-        default=True,
-        description="Whether to wait for prerequisite completion (vs just start)"
+        default=True, description="Whether to wait for prerequisite completion (vs just start)"
     )
     min_delay_hours: float = Field(
         default=0.0,
         ge=0.0,
         le=168.0,
-        description="Minimum hours to wait after prerequisite completes"
+        description="Minimum hours to wait after prerequisite completes",
     )
 
 
@@ -86,8 +84,7 @@ class Workload(BaseModel):
     )
     description: str | None = Field(default=None, max_length=512)
     dependencies: list["WorkloadDependency"] = Field(
-        default=[],
-        description="List of prerequisite workloads that must complete first"
+        default=[], description="List of prerequisite workloads that must complete first"
     )
 
     @field_validator("deadline_hours")
@@ -218,8 +215,7 @@ class FleetOptimizationResult(BaseModel):
     total_workloads: int
     optimization_timestamp: datetime = Field(default_factory=datetime.now)
     dependency_order: list[UUID] = Field(
-        default=[],
-        description="Topologically sorted workload execution order"
+        default=[], description="Topologically sorted workload execution order"
     )
 
     @property

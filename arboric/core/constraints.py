@@ -71,8 +71,7 @@ class DependencyGraph:
 
                 if prereq_id not in self.workloads:
                     raise InvalidDependencyError(
-                        f"Workload '{workload.name}' depends on unknown "
-                        f"workload ID {prereq_id}"
+                        f"Workload '{workload.name}' depends on unknown workload ID {prereq_id}"
                     )
 
                 if prereq_id == workload.id:
@@ -125,14 +124,11 @@ class DependencyGraph:
         """
         # Calculate in-degrees (number of prerequisites)
         in_degree: dict[UUID, int] = {
-            wid: len(prereqs)
-            for wid, prereqs in self.adjacency_list.items()
+            wid: len(prereqs) for wid, prereqs in self.adjacency_list.items()
         }
 
         # Start with workloads that have no dependencies
-        queue: list[UUID] = [
-            wid for wid, deg in in_degree.items() if deg == 0
-        ]
+        queue: list[UUID] = [wid for wid, deg in in_degree.items() if deg == 0]
         sorted_order: list[UUID] = []
 
         while queue:
@@ -147,9 +143,7 @@ class DependencyGraph:
 
         # If not all workloads processed, cycle exists
         if len(sorted_order) != len(self.workloads):
-            raise CircularDependencyError(
-                "Failed to produce topological sort - cycle detected"
-            )
+            raise CircularDependencyError("Failed to produce topological sort - cycle detected")
 
         return sorted_order
 
@@ -171,7 +165,6 @@ class DependencyGraph:
             return 0
 
         prereq_levels = [
-            self.get_workload_level(prereq)
-            for prereq in self.adjacency_list[workload_id]
+            self.get_workload_level(prereq) for prereq in self.adjacency_list[workload_id]
         ]
         return max(prereq_levels) + 1

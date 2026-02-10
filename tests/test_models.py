@@ -145,9 +145,7 @@ class TestWorkloadDependency:
 
     def test_dependency_defaults(self):
         """Test default values for dependency fields."""
-        dep = WorkloadDependency(
-            source_workload_id="12345678-1234-5678-1234-567812345678"
-        )
+        dep = WorkloadDependency(source_workload_id="12345678-1234-5678-1234-567812345678")
         assert dep.depends_on_completion is True
         assert dep.min_delay_hours == 0.0
 
