@@ -32,6 +32,33 @@ class WorkloadType(str, Enum):
     GENERIC = "generic"
 
 
+class WorkloadDependency(BaseModel):
+    """
+    Represents a dependency relationship between workloads.
+
+    A workload with dependencies cannot start until its prerequisite
+    workloads complete (and any minimum delay elapses).
+
+    Example:
+        If Job B depends on Job A:
+        - source_workload_id = A's UUID (the prerequisite)
+        - This dependency is stored in Job B's dependencies list
+    """
+
+    source_workload_id: UUID = Field(
+        ..., description="UUID of the prerequisite workload that must complete first"
+    )
+    depends_on_completion: bool = Field(
+        default=True, description="Whether to wait for prerequisite completion (vs just start)"
+    )
+    min_delay_hours: float = Field(
+        default=0.0,
+        ge=0.0,
+        le=168.0,
+        description="Minimum hours to wait after prerequisite completes",
+    )
+
+
 class Workload(BaseModel):
     """
     Represents a schedulable compute workload.
@@ -56,6 +83,9 @@ class Workload(BaseModel):
         default=WorkloadPriority.NORMAL, description="Scheduling priority"
     )
     description: str | None = Field(default=None, max_length=512)
+    dependencies: list["WorkloadDependency"] = Field(
+        default=[], description="List of prerequisite workloads that must complete first"
+    )
 
     @field_validator("deadline_hours")
     @classmethod
@@ -184,6 +214,9 @@ class FleetOptimizationResult(BaseModel):
     total_carbon_savings_kg: float
     total_workloads: int
     optimization_timestamp: datetime = Field(default_factory=datetime.now)
+    dependency_order: list[UUID] = Field(
+        default=[], description="Topologically sorted workload execution order"
+    )
 
     @property
     def average_cost_savings_percent(self) -> float:

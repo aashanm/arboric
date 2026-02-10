@@ -12,6 +12,7 @@ Architecture:
 """
 
 from datetime import timedelta
+from uuid import UUID
 
 import pandas as pd
 
@@ -276,26 +277,77 @@ class Autopilot:
         forecast_df: pd.DataFrame,
     ) -> FleetOptimizationResult:
         """
-        Optimize scheduling for multiple workloads.
+        Optimize scheduling for multiple workloads with dependency constraints.
 
-        Note: This is a greedy algorithm that optimizes each workload
-        independently. Future versions will implement constraint-aware
-        scheduling for resource contention.
+        Algorithm:
+        1. Validates dependency graph for cycles and invalid references
+        2. Sorts workloads topologically (prerequisites first)
+        3. Optimizes each workload while respecting dependency constraints
+        4. Ensures dependent workloads start after prerequisites complete
 
         Args:
-            workloads: List of workloads to schedule
+            workloads: List of workloads (may have dependencies)
             forecast_df: Grid forecast DataFrame
 
         Returns:
-            FleetOptimizationResult with aggregated metrics
+            FleetOptimizationResult with constraint-aware schedules
+
+        Raises:
+            DependencyGraphError: If dependency graph is invalid
+            ValueError: If constraints cannot be satisfied
         """
-        schedules = []
+        from arboric.core.constraints import DependencyGraph
+
+        # Handle empty workload list
+        if not workloads:
+            return FleetOptimizationResult(
+                schedules=[],
+                total_cost_savings=0.0,
+                total_carbon_savings_kg=0.0,
+                total_workloads=0,
+                dependency_order=[],
+            )
+
+        # Build and validate dependency graph
+        dep_graph = DependencyGraph(workloads)
+        execution_order = dep_graph.topological_sort()
+
+        self._log(f"Optimizing {len(workloads)} workloads with dependencies")
+
+        schedules: list[ScheduleResult] = []
+        completed_schedules: dict[UUID, ScheduleResult] = {}
         total_cost_savings = 0.0
         total_carbon_savings = 0.0
 
-        for workload in workloads:
-            result = self.optimize_schedule(workload, forecast_df)
+        # Process workloads in topological order
+        for workload_id in execution_order:
+            workload = dep_graph.workloads[workload_id]
+            level = dep_graph.get_workload_level(workload_id)
+
+            self._log(
+                f"Processing {workload.name} "
+                f"(level {level}, {len(workload.dependencies)} dependencies)"
+            )
+
+            # Apply dependency constraints to forecast
+            constrained_forecast = self._apply_dependency_constraints(
+                workload=workload,
+                forecast_df=forecast_df,
+                completed_schedules=completed_schedules,
+            )
+
+            # Optimize with constrained forecast
+            result = self.optimize_schedule(workload, constrained_forecast)
+
+            # Validate constraints satisfied
+            self._validate_schedule_constraints(
+                result=result,
+                workload=workload,
+                completed_schedules=completed_schedules,
+            )
+
             schedules.append(result)
+            completed_schedules[workload_id] = result
             total_cost_savings += result.cost_savings
             total_carbon_savings += result.carbon_savings_kg
 
@@ -304,7 +356,122 @@ class Autopilot:
             total_cost_savings=total_cost_savings,
             total_carbon_savings_kg=total_carbon_savings,
             total_workloads=len(workloads),
+            dependency_order=execution_order,
         )
+
+    def _apply_dependency_constraints(
+        self,
+        workload: Workload,
+        forecast_df: pd.DataFrame,
+        completed_schedules: dict[UUID, ScheduleResult],
+    ) -> pd.DataFrame:
+        """
+        Create forecast window that enforces dependency timing constraints.
+
+        Shifts forecast so workload can only be scheduled after all
+        prerequisites complete (plus any minimum delays).
+
+        Args:
+            workload: Workload to schedule
+            forecast_df: Original forecast
+            completed_schedules: Already-scheduled prerequisites
+
+        Returns:
+            Constrained forecast DataFrame
+
+        Raises:
+            ValueError: If constraints cannot be satisfied
+        """
+        if not workload.dependencies:
+            return forecast_df
+
+        baseline_start = forecast_df.index[0]
+        earliest_start = baseline_start
+
+        # Calculate earliest start based on all dependencies
+        for dep in workload.dependencies:
+            prereq_id = dep.source_workload_id
+            prereq_schedule = completed_schedules.get(prereq_id)
+
+            if prereq_schedule is None:
+                raise ValueError(
+                    f"{workload.name} depends on {prereq_id}, but that "
+                    "workload has not been scheduled. This indicates a bug."
+                )
+
+            if dep.depends_on_completion:
+                # Must wait for prerequisite completion + delay
+                constraint_time = prereq_schedule.optimal_end + timedelta(hours=dep.min_delay_hours)
+                earliest_start = max(earliest_start, constraint_time)
+
+        # Check if deadline can be satisfied
+        workload_deadline = baseline_start + timedelta(hours=workload.deadline_hours)
+        latest_possible_end = earliest_start + timedelta(hours=workload.duration_hours)
+
+        if latest_possible_end > workload_deadline:
+            prereq_names = [
+                completed_schedules[dep.source_workload_id].workload.name
+                for dep in workload.dependencies
+            ]
+            raise ValueError(
+                f"Cannot satisfy deadline for '{workload.name}'. "
+                f"Dependencies on {prereq_names} force start at "
+                f"{earliest_start.strftime('%Y-%m-%d %H:%M')}, but workload "
+                f"must complete by {workload_deadline.strftime('%Y-%m-%d %H:%M')}. "
+                f"Consider extending deadline or removing dependencies."
+            )
+
+        # Shift forecast if needed
+        if earliest_start > baseline_start:
+            time_shift = earliest_start - baseline_start
+            self._log(
+                f"Dependency constraints shift {workload.name} start by "
+                f"{time_shift.total_seconds() / 3600:.1f} hours"
+            )
+
+            # Create shifted forecast
+            shifted_forecast = forecast_df.copy()
+            shifted_forecast.index = forecast_df.index + time_shift
+            shifted_forecast = shifted_forecast[shifted_forecast.index >= earliest_start]
+
+            if shifted_forecast.empty:
+                raise ValueError(
+                    f"Cannot schedule {workload.name}. Prerequisites complete at "
+                    f"{earliest_start}, but forecast ends at {forecast_df.index[-1]}. "
+                    f"Provide longer forecast window."
+                )
+
+            return shifted_forecast
+
+        return forecast_df
+
+    def _validate_schedule_constraints(
+        self,
+        result: ScheduleResult,
+        workload: Workload,
+        completed_schedules: dict[UUID, ScheduleResult],
+    ) -> None:
+        """
+        Validate that schedule satisfies all dependency constraints.
+
+        Raises ValueError if constraints violated.
+
+        Args:
+            result: The schedule result to validate
+            workload: The workload being scheduled
+            completed_schedules: Already-scheduled workloads
+        """
+        for dep in workload.dependencies:
+            prereq_schedule = completed_schedules[dep.source_workload_id]
+
+            if dep.depends_on_completion:
+                min_start = prereq_schedule.optimal_end + timedelta(hours=dep.min_delay_hours)
+
+                if result.optimal_start < min_start:
+                    raise ValueError(
+                        f"Constraint violation: {workload.name} starts at "
+                        f"{result.optimal_start}, but must wait until {min_start}"
+                    )
 
 
 def create_autopilot(

@@ -225,18 +225,21 @@ class MockGrid:
         total = base_renewable + solar + max(0, wind)
         return min(95, max(5, total + self._random.gauss(0, 3)))
 
-    def get_forecast(self, hours: int = 24, resolution_minutes: int = 60) -> pd.DataFrame:
+    def get_forecast(
+        self, hours: int = 24, resolution_minutes: int = 60, start_time: datetime | None = None
+    ) -> pd.DataFrame:
         """
         Generate a grid forecast for the specified time horizon.
 
         Args:
             hours: Forecast horizon in hours
             resolution_minutes: Time resolution (default 60 = hourly)
+            start_time: Optional start time (defaults to current time for realistic forecasts)
 
         Returns:
             DataFrame with timestamp, co2_intensity, price, renewable_percentage
         """
-        now = datetime.now().replace(minute=0, second=0, microsecond=0)
+        now = (start_time or datetime.now()).replace(minute=0, second=0, microsecond=0)
         windows = []
 
         intervals = (hours * 60) // resolution_minutes
