@@ -6,14 +6,11 @@ for cost and carbon optimization. Built with Typer and Rich.
 """
 
 import time
-from datetime import datetime
-from typing import Optional
 
 import typer
 from rich import box
 from rich.align import Align
-from rich.console import Console, Group
-from rich.live import Live
+from rich.console import Console
 from rich.panel import Panel
 from rich.progress import (
     BarColumn,
@@ -23,14 +20,13 @@ from rich.progress import (
     TextColumn,
     TimeElapsedColumn,
 )
-from rich.style import Style
 from rich.table import Table
 from rich.text import Text
 
 from arboric.core.autopilot import Autopilot, OptimizationConfig
-from arboric.core.grid_oracle import MockGrid
-from arboric.core.models import Workload, WorkloadType, FleetOptimizationResult
 from arboric.core.config import ArboricConfig, get_config
+from arboric.core.grid_oracle import MockGrid
+from arboric.core.models import FleetOptimizationResult, Workload, WorkloadType
 
 # Initialize Rich console
 console = Console()
@@ -134,14 +130,13 @@ def create_comparison_table(result) -> Table:
 def create_forecast_chart(forecast_df, optimal_start, workload_duration) -> str:
     """Create an ASCII visualization of the forecast with scheduled window."""
     hours = min(24, len(forecast_df))
-    chart_width = 60
 
     # Normalize values for display
-    prices = forecast_df['price'].head(hours).values
-    carbons = forecast_df['co2_intensity'].head(hours).values
+    prices = forecast_df["price"].head(hours).values
+    carbons = forecast_df["co2_intensity"].head(hours).values
 
     price_min, price_max = prices.min(), prices.max()
-    carbon_min, carbon_max = carbons.min(), carbons.max()
+    _carbon_min, _carbon_max = carbons.min(), carbons.max()
 
     def normalize(val, vmin, vmax, height=8):
         if vmax == vmin:
@@ -161,7 +156,10 @@ def create_forecast_chart(forecast_df, optimal_start, workload_duration) -> str:
             if h >= row:
                 # Check if this hour is in the optimal window
                 hour_ts = forecast_df.index[i]
-                if hour_ts >= optimal_start and (hour_ts - optimal_start).total_seconds() / 3600 < workload_duration:
+                if (
+                    hour_ts >= optimal_start
+                    and (hour_ts - optimal_start).total_seconds() / 3600 < workload_duration
+                ):
                     line += "█"  # Scheduled window
                 else:
                     line += "▒"
@@ -211,13 +209,19 @@ def simulate_optimization_animation(workload_name: str, duration: float = 1.5):
 @app.command()
 def optimize(
     workload_name: str = typer.Argument(..., help="Name of the workload to optimize"),
-    duration: Optional[float] = typer.Option(None, "--duration", "-d", help="Workload duration in hours"),
-    deadline: Optional[float] = typer.Option(None, "--deadline", "-D", help="Must complete within hours"),
-    power: Optional[float] = typer.Option(None, "--power", "-p", help="Power draw in kW"),
-    region: Optional[str] = typer.Option(None, "--region", "-r", help="Grid region"),
+    duration: float | None = typer.Option(
+        None, "--duration", "-d", help="Workload duration in hours"
+    ),
+    deadline: float | None = typer.Option(
+        None, "--deadline", "-D", help="Must complete within hours"
+    ),
+    power: float | None = typer.Option(None, "--power", "-p", help="Power draw in kW"),
+    region: str | None = typer.Option(None, "--region", "-r", help="Grid region"),
     quiet: bool = typer.Option(False, "--quiet", "-q", help="Minimal output"),
-    output: Optional[str] = typer.Option(None, "--output", "-o", help="Output file path (or '-' for stdout)"),
-    format: Optional[str] = typer.Option(None, "--format", "-f", help="Export format: json, csv"),
+    output: str | None = typer.Option(
+        None, "--output", "-o", help="Output file path (or '-' for stdout)"
+    ),
+    format: str | None = typer.Option(None, "--format", "-f", help="Export format: json, csv"),
 ):
     """
     Optimize a single workload for cost and carbon efficiency.
@@ -287,19 +291,28 @@ def optimize(
 
     # Handle export if requested
     if output:
-        from arboric.cli.export import ExportError, ExportFormat, detect_format, export_schedule_result
+        from arboric.cli.export import (
+            ExportError,
+            ExportFormat,
+            detect_format,
+            export_schedule_result,
+        )
 
         # Determine format
         if format:
             try:
                 export_format = ExportFormat(format.lower())
             except ValueError:
-                console.print(f"[{ARBORIC_RED}]Invalid format '{format}'. Use 'json' or 'csv'.[/{ARBORIC_RED}]")
+                console.print(
+                    f"[{ARBORIC_RED}]Invalid format '{format}'. Use 'json' or 'csv'.[/{ARBORIC_RED}]"
+                )
                 raise typer.Exit(1)
         else:
             export_format = detect_format(output)
             if not export_format:
-                console.print(f"[{ARBORIC_RED}]Cannot detect format from '{output}'. Use --format flag.[/{ARBORIC_RED}]")
+                console.print(
+                    f"[{ARBORIC_RED}]Cannot detect format from '{output}'. Use --format flag.[/{ARBORIC_RED}]"
+                )
                 raise typer.Exit(1)
 
         # Export
@@ -330,7 +343,9 @@ def optimize(
             f"({result.delay_hours:.1f}h delay)[/bold {ARBORIC_GREEN}]"
         )
     else:
-        console.print(f"[bold {ARBORIC_GREEN}]Optimal window is NOW - executing immediately[/bold {ARBORIC_GREEN}]")
+        console.print(
+            f"[bold {ARBORIC_GREEN}]Optimal window is NOW - executing immediately[/bold {ARBORIC_GREEN}]"
+        )
     console.print()
 
     # Show comparison table
@@ -357,8 +372,10 @@ def optimize(
 
 @app.command()
 def demo(
-    output: Optional[str] = typer.Option(None, "--output", "-o", help="Output file path (or '-' for stdout)"),
-    format: Optional[str] = typer.Option(None, "--format", "-f", help="Export format: json, csv"),
+    output: str | None = typer.Option(
+        None, "--output", "-o", help="Output file path (or '-' for stdout)"
+    ),
+    format: str | None = typer.Option(None, "--format", "-f", help="Export format: json, csv"),
 ):
     """
     Run the Arboric Autopilot demo with multiple AI workloads.
@@ -511,12 +528,16 @@ minimum cost and carbon emissions.
             try:
                 export_format = ExportFormat(format.lower())
             except ValueError:
-                console.print(f"[{ARBORIC_RED}]Invalid format '{format}'. Use 'json' or 'csv'.[/{ARBORIC_RED}]")
+                console.print(
+                    f"[{ARBORIC_RED}]Invalid format '{format}'. Use 'json' or 'csv'.[/{ARBORIC_RED}]"
+                )
                 raise typer.Exit(1)
         else:
             export_format = detect_format(output)
             if not export_format:
-                console.print(f"[{ARBORIC_RED}]Cannot detect format from '{output}'. Use --format flag.[/{ARBORIC_RED}]")
+                console.print(
+                    f"[{ARBORIC_RED}]Cannot detect format from '{output}'. Use --format flag.[/{ARBORIC_RED}]"
+                )
                 raise typer.Exit(1)
 
         # Export
@@ -581,8 +602,12 @@ minimum cost and carbon emissions.
     total_baseline_carbon = sum(r.baseline_carbon_kg for r in results)
     total_optimized_carbon = sum(r.optimized_carbon_kg for r in results)
 
-    cost_reduction_pct = (total_cost_saved / total_baseline_cost * 100) if total_baseline_cost > 0 else 0
-    carbon_reduction_pct = (total_carbon_saved / total_baseline_carbon * 100) if total_baseline_carbon > 0 else 0
+    cost_reduction_pct = (
+        (total_cost_saved / total_baseline_cost * 100) if total_baseline_cost > 0 else 0
+    )
+    carbon_reduction_pct = (
+        (total_carbon_saved / total_baseline_carbon * 100) if total_baseline_carbon > 0 else 0
+    )
 
     # Annualized projections (assuming daily runs)
     annual_cost_savings = total_cost_saved * 365
@@ -621,19 +646,21 @@ minimum cost and carbon emissions.
 [bold {cost_savings_color}]  💵 ANNUALIZED SAVINGS: ${abs(annual_cost_savings):>,.0f}/year {"" if total_cost_saved >= 0 else "(projected cost increase)"}[/bold {cost_savings_color}]
 [bold {cost_savings_color}]═══════════════════════════════════════════════════════════════[/bold {cost_savings_color}]
 
-[dim]Plus: 🌲 {annual_carbon_savings/1000:,.1f} metric tons CO₂ avoided per year[/dim]
+[dim]Plus: 🌲 {annual_carbon_savings / 1000:,.1f} metric tons CO₂ avoided per year[/dim]
 """
 
-    console.print(Panel(
-        impact_text,
-        border_style=ARBORIC_GREEN,
-        padding=(0, 1),
-    ))
+    console.print(
+        Panel(
+            impact_text,
+            border_style=ARBORIC_GREEN,
+            padding=(0, 1),
+        )
+    )
 
     # Closing message
     console.print()
     console.print(
-        f"[dim]Arboric: Where algorithms meet sustainability.[/dim]",
+        "[dim]Arboric: Where algorithms meet sustainability.[/dim]",
         justify="center",
     )
 
@@ -642,8 +669,10 @@ minimum cost and carbon emissions.
 def forecast(
     region: str = typer.Option("US-WEST", "--region", "-r", help="Grid region"),
     hours: int = typer.Option(24, "--hours", "-h", help="Forecast hours"),
-    output: Optional[str] = typer.Option(None, "--output", "-o", help="Output file path (or '-' for stdout)"),
-    format: Optional[str] = typer.Option(None, "--format", "-f", help="Export format: json, csv"),
+    output: str | None = typer.Option(
+        None, "--output", "-o", help="Output file path (or '-' for stdout)"
+    ),
+    format: str | None = typer.Option(None, "--format", "-f", help="Export format: json, csv"),
 ):
     """
     Display the current grid forecast for a region.
@@ -670,12 +699,16 @@ def forecast(
             try:
                 export_format = ExportFormat(format.lower())
             except ValueError:
-                console.print(f"[{ARBORIC_RED}]Invalid format '{format}'. Use 'json' or 'csv'.[/{ARBORIC_RED}]")
+                console.print(
+                    f"[{ARBORIC_RED}]Invalid format '{format}'. Use 'json' or 'csv'.[/{ARBORIC_RED}]"
+                )
                 raise typer.Exit(1)
         else:
             export_format = detect_format(output)
             if not export_format:
-                console.print(f"[{ARBORIC_RED}]Cannot detect format from '{output}'. Use --format flag.[/{ARBORIC_RED}]")
+                console.print(
+                    f"[{ARBORIC_RED}]Cannot detect format from '{output}'. Use --format flag.[/{ARBORIC_RED}]"
+                )
                 raise typer.Exit(1)
 
         # Export
@@ -702,18 +735,26 @@ def forecast(
     table.add_column("Status", justify="center", width=20)
 
     for timestamp, row in forecast_df.iterrows():
-        price_color = ARBORIC_GREEN if row['price'] < 0.10 else (ARBORIC_AMBER if row['price'] < 0.15 else ARBORIC_RED)
-        carbon_color = ARBORIC_GREEN if row['co2_intensity'] < 250 else (ARBORIC_AMBER if row['co2_intensity'] < 400 else ARBORIC_RED)
+        price_color = (
+            ARBORIC_GREEN
+            if row["price"] < 0.10
+            else (ARBORIC_AMBER if row["price"] < 0.15 else ARBORIC_RED)
+        )
+        carbon_color = (
+            ARBORIC_GREEN
+            if row["co2_intensity"] < 250
+            else (ARBORIC_AMBER if row["co2_intensity"] < 400 else ARBORIC_RED)
+        )
 
         # Status indicator
         status_parts = []
-        if row['price'] < 0.08:
+        if row["price"] < 0.08:
             status_parts.append("💰 CHEAP")
-        if row['co2_intensity'] < 200:
+        if row["co2_intensity"] < 200:
             status_parts.append("🌱 GREEN")
-        if row['price'] > 0.18:
+        if row["price"] > 0.18:
             status_parts.append("⚠️  PEAK")
-        if row['co2_intensity'] > 500:
+        if row["co2_intensity"] > 500:
             status_parts.append("🏭 DIRTY")
 
         status = " ".join(status_parts) if status_parts else "─"
@@ -730,17 +771,25 @@ def forecast(
 
     # Summary stats
     console.print()
-    console.print(f"[bold]Summary:[/bold]")
-    console.print(f"  Price range:  ${forecast_df['price'].min():.4f} - ${forecast_df['price'].max():.4f}/kWh")
-    console.print(f"  Carbon range: {forecast_df['co2_intensity'].min():.0f} - {forecast_df['co2_intensity'].max():.0f} gCO₂/kWh")
+    console.print("[bold]Summary:[/bold]")
+    console.print(
+        f"  Price range:  ${forecast_df['price'].min():.4f} - ${forecast_df['price'].max():.4f}/kWh"
+    )
+    console.print(
+        f"  Carbon range: {forecast_df['co2_intensity'].min():.0f} - {forecast_df['co2_intensity'].max():.0f} gCO₂/kWh"
+    )
 
     # Best windows
-    best_price_idx = forecast_df['price'].idxmin()
-    best_carbon_idx = forecast_df['co2_intensity'].idxmin()
+    best_price_idx = forecast_df["price"].idxmin()
+    best_carbon_idx = forecast_df["co2_intensity"].idxmin()
 
     console.print()
-    console.print(f"[bold {ARBORIC_GREEN}]Best price window:[/bold {ARBORIC_GREEN}] {best_price_idx.strftime('%H:%M')} (${forecast_df.loc[best_price_idx, 'price']:.4f}/kWh)")
-    console.print(f"[bold {ARBORIC_GREEN}]Greenest window:[/bold {ARBORIC_GREEN}] {best_carbon_idx.strftime('%H:%M')} ({forecast_df.loc[best_carbon_idx, 'co2_intensity']:.0f} gCO₂/kWh)")
+    console.print(
+        f"[bold {ARBORIC_GREEN}]Best price window:[/bold {ARBORIC_GREEN}] {best_price_idx.strftime('%H:%M')} (${forecast_df.loc[best_price_idx, 'price']:.4f}/kWh)"
+    )
+    console.print(
+        f"[bold {ARBORIC_GREEN}]Greenest window:[/bold {ARBORIC_GREEN}] {best_carbon_idx.strftime('%H:%M')} ({forecast_df.loc[best_carbon_idx, 'co2_intensity']:.0f} gCO₂/kWh)"
+    )
 
 
 @app.command()
@@ -857,9 +906,13 @@ def config(
 
             # API settings
             if cfg.api.watttime_enabled:
-                console.print(f"[{ARBORIC_GREEN}]✓[/{ARBORIC_GREEN}] WattTime API integration enabled")
+                console.print(
+                    f"[{ARBORIC_GREEN}]✓[/{ARBORIC_GREEN}] WattTime API integration enabled"
+                )
             else:
-                console.print(f"[{ARBORIC_AMBER}]○[/{ARBORIC_AMBER}] WattTime API integration disabled")
+                console.print(
+                    f"[{ARBORIC_AMBER}]○[/{ARBORIC_AMBER}] WattTime API integration disabled"
+                )
             console.print()
 
         except Exception as e:
@@ -870,13 +923,15 @@ def config(
         if config_path.exists():
             console.print(f"[{ARBORIC_AMBER}]Config file already exists at:[/{ARBORIC_AMBER}]")
             console.print(f"  {config_path}")
-            console.print(f"\n[dim]Use 'arboric config edit' to modify it.[/dim]")
+            console.print("\n[dim]Use 'arboric config edit' to modify it.[/dim]")
         else:
             try:
                 cfg = ArboricConfig.create_default_config()
-                console.print(f"[{ARBORIC_GREEN}]✓[/{ARBORIC_GREEN}] Created default configuration at:")
+                console.print(
+                    f"[{ARBORIC_GREEN}]✓[/{ARBORIC_GREEN}] Created default configuration at:"
+                )
                 console.print(f"  {config_path}")
-                console.print(f"\n[dim]Edit this file to customize your settings.[/dim]")
+                console.print("\n[dim]Edit this file to customize your settings.[/dim]")
             except Exception as e:
                 console.print(f"[{ARBORIC_RED}]Error creating config: {e}[/{ARBORIC_RED}]")
 
@@ -886,16 +941,20 @@ def config(
         import subprocess
 
         if not config_path.exists():
-            console.print(f"[{ARBORIC_AMBER}]Config file doesn't exist. Creating default...[/{ARBORIC_AMBER}]")
+            console.print(
+                f"[{ARBORIC_AMBER}]Config file doesn't exist. Creating default...[/{ARBORIC_AMBER}]"
+            )
             ArboricConfig.create_default_config()
 
         # Try to open in user's preferred editor
-        editor = os.environ.get('EDITOR', os.environ.get('VISUAL', 'nano'))
+        editor = os.environ.get("EDITOR", os.environ.get("VISUAL", "nano"))
         try:
             subprocess.run([editor, str(config_path)], check=True)
             console.print(f"[{ARBORIC_GREEN}]✓[/{ARBORIC_GREEN}] Configuration saved")
         except FileNotFoundError:
-            console.print(f"[{ARBORIC_AMBER}]Editor '{editor}' not found. Config file location:[/{ARBORIC_AMBER}]")
+            console.print(
+                f"[{ARBORIC_AMBER}]Editor '{editor}' not found. Config file location:[/{ARBORIC_AMBER}]"
+            )
             console.print(f"  {config_path}")
         except Exception as e:
             console.print(f"[{ARBORIC_RED}]Error opening editor: {e}[/{ARBORIC_RED}]")
@@ -905,15 +964,15 @@ def config(
         if config_path.exists():
             console.print(f"[{ARBORIC_GREEN}]Configuration file:[/{ARBORIC_GREEN}]")
             console.print(f"  {config_path}")
-            console.print(f"\n[dim]Use 'arboric config edit' to modify it.[/dim]")
+            console.print("\n[dim]Use 'arboric config edit' to modify it.[/dim]")
         else:
             console.print(f"[{ARBORIC_AMBER}]No configuration file found.[/{ARBORIC_AMBER}]")
             console.print(f"Expected location: {config_path}")
-            console.print(f"\n[dim]Use 'arboric config init' to create one.[/dim]")
+            console.print("\n[dim]Use 'arboric config init' to create one.[/dim]")
 
     else:
         console.print(f"[{ARBORIC_RED}]Unknown action: {action}[/{ARBORIC_RED}]")
-        console.print(f"\nAvailable actions: show, init, edit, path")
+        console.print("\nAvailable actions: show, init, edit, path")
 
 
 @app.command()
@@ -945,7 +1004,9 @@ def api(
     console.print()
 
     if reload:
-        console.print(f"[{ARBORIC_AMBER}]⚠️  Auto-reload enabled (development mode)[/{ARBORIC_AMBER}]")
+        console.print(
+            f"[{ARBORIC_AMBER}]⚠️  Auto-reload enabled (development mode)[/{ARBORIC_AMBER}]"
+        )
         console.print()
 
     uvicorn.run(

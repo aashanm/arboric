@@ -5,14 +5,16 @@ Tests validation, computed properties, and business logic for
 Workload, GridWindow, and ScheduleResult models.
 """
 
-import pytest
 from datetime import datetime, timedelta
+
+import pytest
+
 from arboric.core.models import (
-    Workload,
-    WorkloadType,
-    WorkloadPriority,
     GridWindow,
     ScheduleResult,
+    Workload,
+    WorkloadPriority,
+    WorkloadType,
 )
 
 

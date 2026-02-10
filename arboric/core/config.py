@@ -5,9 +5,7 @@ Handles loading and validation of user configuration from ~/.arboric/config.yaml
 Provides sensible defaults for all settings.
 """
 
-import os
 from pathlib import Path
-from typing import Optional
 
 import yaml
 from pydantic import BaseModel, Field, field_validator
@@ -17,38 +15,27 @@ class OptimizationSettings(BaseModel):
     """Optimization algorithm settings."""
 
     price_weight: float = Field(
-        default=0.7,
-        ge=0.0,
-        le=1.0,
-        description="Weight for cost optimization (0-1)"
+        default=0.7, ge=0.0, le=1.0, description="Weight for cost optimization (0-1)"
     )
     carbon_weight: float = Field(
-        default=0.3,
-        ge=0.0,
-        le=1.0,
-        description="Weight for carbon optimization (0-1)"
+        default=0.3, ge=0.0, le=1.0, description="Weight for carbon optimization (0-1)"
     )
     min_delay_hours: float = Field(
-        default=0.0,
-        ge=0.0,
-        description="Minimum delay before starting workloads (hours)"
+        default=0.0, ge=0.0, description="Minimum delay before starting workloads (hours)"
     )
-    prefer_continuous: bool = Field(
-        default=True,
-        description="Prefer continuous execution windows"
-    )
+    prefer_continuous: bool = Field(default=True, description="Prefer continuous execution windows")
 
-    @field_validator('price_weight', 'carbon_weight')
+    @field_validator("price_weight", "carbon_weight")
     @classmethod
     def validate_weights(cls, v, info):
         """Ensure weights sum to 1.0."""
-        if info.field_name == 'carbon_weight':
+        if info.field_name == "carbon_weight":
             # Only validate when both fields are present
             data = info.data
-            if 'price_weight' in data:
-                price_weight = data['price_weight']
+            if "price_weight" in data:
+                price_weight = data["price_weight"]
                 if abs(price_weight + v - 1.0) > 0.01:
-                    raise ValueError('price_weight and carbon_weight must sum to 1.0')
+                    raise ValueError("price_weight and carbon_weight must sum to 1.0")
         return v
 
 
@@ -64,8 +51,8 @@ class DefaultWorkloadSettings(BaseModel):
 class APISettings(BaseModel):
     """Settings for external API integrations."""
 
-    watttime_username: Optional[str] = Field(default=None, description="WattTime API username")
-    watttime_password: Optional[str] = Field(default=None, description="WattTime API password")
+    watttime_username: str | None = Field(default=None, description="WattTime API username")
+    watttime_password: str | None = Field(default=None, description="WattTime API password")
     watttime_enabled: bool = Field(default=False, description="Enable WattTime integration")
 
 
@@ -104,7 +91,7 @@ class ArboricConfig(BaseModel):
         return config_dir
 
     @classmethod
-    def load(cls, config_path: Optional[Path] = None) -> "ArboricConfig":
+    def load(cls, config_path: Path | None = None) -> "ArboricConfig":
         """
         Load configuration from file or use defaults.
 
@@ -123,7 +110,7 @@ class ArboricConfig(BaseModel):
 
         # Load and parse YAML
         try:
-            with open(config_path, 'r') as f:
+            with open(config_path) as f:
                 config_data = yaml.safe_load(f) or {}
 
             # Handle empty file
@@ -136,7 +123,7 @@ class ArboricConfig(BaseModel):
         except Exception as e:
             raise ValueError(f"Error loading config file: {e}")
 
-    def save(self, config_path: Optional[Path] = None) -> None:
+    def save(self, config_path: Path | None = None) -> None:
         """
         Save configuration to file.
 
@@ -152,17 +139,11 @@ class ArboricConfig(BaseModel):
         # Convert to dict and save as YAML
         config_dict = self.model_dump(exclude_none=True)
 
-        with open(config_path, 'w') as f:
-            yaml.safe_dump(
-                config_dict,
-                f,
-                default_flow_style=False,
-                sort_keys=False,
-                indent=2
-            )
+        with open(config_path, "w") as f:
+            yaml.safe_dump(config_dict, f, default_flow_style=False, sort_keys=False, indent=2)
 
     @classmethod
-    def create_default_config(cls, config_path: Optional[Path] = None) -> "ArboricConfig":
+    def create_default_config(cls, config_path: Path | None = None) -> "ArboricConfig":
         """
         Create a default config file if it doesn't exist.
 
@@ -186,7 +167,7 @@ class ArboricConfig(BaseModel):
 
 
 # Global config instance (lazy loaded)
-_config: Optional[ArboricConfig] = None
+_config: ArboricConfig | None = None
 
 
 def get_config(reload: bool = False) -> ArboricConfig:

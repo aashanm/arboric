@@ -4,12 +4,14 @@ Tests for Arboric Autopilot
 Tests optimization algorithm, scheduling logic, and fleet management.
 """
 
-import pytest
-import pandas as pd
 from datetime import datetime, timedelta
+
+import pandas as pd
+import pytest
+
 from arboric.core.autopilot import Autopilot, OptimizationConfig
-from arboric.core.models import Workload, WorkloadPriority, WorkloadType
 from arboric.core.grid_oracle import MockGrid
+from arboric.core.models import Workload, WorkloadPriority, WorkloadType
 
 
 class TestOptimizationConfig:
@@ -104,7 +106,9 @@ class TestAutopilot:
         data = {
             "timestamp": [now + timedelta(hours=i) for i in range(24)],
             "co2_intensity": [300.0] * 24,  # Constant carbon
-            "price": [0.20 if i < 6 else 0.08 for i in range(24)],  # Expensive first 6h, cheap after
+            "price": [
+                0.20 if i < 6 else 0.08 for i in range(24)
+            ],  # Expensive first 6h, cheap after
             "renewable_percentage": [50.0] * 24,
             "region": ["US-WEST"] * 24,
             "confidence": [1.0] * 24,
@@ -132,7 +136,9 @@ class TestAutopilot:
         now = datetime.now().replace(minute=0, second=0, microsecond=0)
         data = {
             "timestamp": [now + timedelta(hours=i) for i in range(24)],
-            "co2_intensity": [600.0 if i < 6 else 200.0 for i in range(24)],  # Dirty first 6h, green after
+            "co2_intensity": [
+                600.0 if i < 6 else 200.0 for i in range(24)
+            ],  # Dirty first 6h, green after
             "price": [0.12] * 24,  # Constant price
             "renewable_percentage": [30.0 if i < 6 else 70.0 for i in range(24)],
             "region": ["US-WEST"] * 24,
@@ -235,7 +241,7 @@ class TestAutopilot:
     def test_optimization_log(self, simple_workload, simple_forecast):
         """Test that optimization generates log messages."""
         autopilot = Autopilot()
-        result = autopilot.optimize_schedule(simple_workload, simple_forecast)
+        autopilot.optimize_schedule(simple_workload, simple_forecast)
 
         log = autopilot.get_log()
         assert len(log) > 0
@@ -279,4 +285,7 @@ class TestAutopilot:
         assert result.optimized_carbon_kg >= 0
 
         # Optimal should be as good or better than baseline
-        assert result.optimized_cost <= result.baseline_cost or abs(result.optimized_cost - result.baseline_cost) < 0.01
+        assert (
+            result.optimized_cost <= result.baseline_cost
+            or abs(result.optimized_cost - result.baseline_cost) < 0.01
+        )

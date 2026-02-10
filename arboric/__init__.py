@@ -33,6 +33,8 @@ __version__ = "0.1.0"
 __author__ = "Arboric"
 __license__ = "MIT"
 
+from arboric.core.autopilot import Autopilot, OptimizationConfig, create_autopilot
+from arboric.core.grid_oracle import MockGrid, get_grid
 from arboric.core.models import (
     FleetOptimizationResult,
     GridWindow,
@@ -41,8 +43,6 @@ from arboric.core.models import (
     WorkloadPriority,
     WorkloadType,
 )
-from arboric.core.grid_oracle import MockGrid, get_grid
-from arboric.core.autopilot import Autopilot, OptimizationConfig, create_autopilot
 
 __all__ = [
     # Models

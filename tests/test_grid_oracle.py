@@ -4,10 +4,10 @@ Tests for Arboric Grid Oracle
 Tests forecast generation, regional profiles, and grid event detection.
 """
 
-import pytest
 import pandas as pd
-from datetime import datetime
-from arboric.core.grid_oracle import MockGrid, REGION_PROFILES
+import pytest
+
+from arboric.core.grid_oracle import REGION_PROFILES, MockGrid
 
 
 class TestMockGrid:
