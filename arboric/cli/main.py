@@ -470,8 +470,12 @@ minimum cost and carbon emissions.
     console.print()
 
     # Initialize grid and autopilot
-    grid = MockGrid(region="US-WEST")
-    forecast = grid.get_forecast(hours=48)  # Extended forecast
+    # Start forecast at evening peak (18:00) to show optimizer finding cheaper morning windows
+    from datetime import datetime, timedelta
+    demo_start = datetime.now().replace(hour=18, minute=0, second=0, microsecond=0)
+
+    grid = MockGrid(region="US-WEST", seed=42)  # Fixed seed for consistent demo results
+    forecast = grid.get_forecast(hours=48, start_time=demo_start)  # Extended forecast
     autopilot = Autopilot()
 
     # Process each workload with live updates
