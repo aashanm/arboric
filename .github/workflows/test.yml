@@ -82,6 +82,7 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
+          pip install numpy>=1.24.0
           pip install -e ".[dev]"
 
       - name: Run API tests
