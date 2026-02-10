@@ -29,7 +29,7 @@ from rich.text import Text
 
 from arboric.core.autopilot import Autopilot, OptimizationConfig
 from arboric.core.grid_oracle import MockGrid
-from arboric.core.models import Workload, WorkloadType
+from arboric.core.models import Workload, WorkloadType, FleetOptimizationResult
 from arboric.core.config import ArboricConfig, get_config
 
 # Initialize Rich console
@@ -216,11 +216,15 @@ def optimize(
     power: Optional[float] = typer.Option(None, "--power", "-p", help="Power draw in kW"),
     region: Optional[str] = typer.Option(None, "--region", "-r", help="Grid region"),
     quiet: bool = typer.Option(False, "--quiet", "-q", help="Minimal output"),
+    output: Optional[str] = typer.Option(None, "--output", "-o", help="Output file path (or '-' for stdout)"),
+    format: Optional[str] = typer.Option(None, "--format", "-f", help="Export format: json, csv"),
 ):
     """
     Optimize a single workload for cost and carbon efficiency.
 
     Example: arboric optimize "LLM Training" --duration 6 --deadline 24
+
+    Export results: arboric optimize "Job" --output results.json
 
     If options are not specified, values from ~/.arboric/config.yaml will be used.
     """
@@ -281,6 +285,33 @@ def optimize(
     autopilot = Autopilot(config=opt_config)
     result = autopilot.optimize_schedule(workload, forecast)
 
+    # Handle export if requested
+    if output:
+        from arboric.cli.export import ExportError, ExportFormat, detect_format, export_schedule_result
+
+        # Determine format
+        if format:
+            try:
+                export_format = ExportFormat(format.lower())
+            except ValueError:
+                console.print(f"[{ARBORIC_RED}]Invalid format '{format}'. Use 'json' or 'csv'.[/{ARBORIC_RED}]")
+                raise typer.Exit(1)
+        else:
+            export_format = detect_format(output)
+            if not export_format:
+                console.print(f"[{ARBORIC_RED}]Cannot detect format from '{output}'. Use --format flag.[/{ARBORIC_RED}]")
+                raise typer.Exit(1)
+
+        # Export
+        try:
+            export_schedule_result(result, output, export_format, command="optimize")
+            if output != "-":
+                console.print(f"[{ARBORIC_GREEN}]✓ Exported to {output}[/{ARBORIC_GREEN}]")
+                console.print()
+        except ExportError as e:
+            console.print(f"[{ARBORIC_RED}]Export failed: {e}[/{ARBORIC_RED}]")
+            raise typer.Exit(1)
+
     # Display events
     events = grid.detect_events(forecast)
     if events and not quiet:
@@ -325,12 +356,17 @@ def optimize(
 
 
 @app.command()
-def demo():
+def demo(
+    output: Optional[str] = typer.Option(None, "--output", "-o", help="Output file path (or '-' for stdout)"),
+    format: Optional[str] = typer.Option(None, "--format", "-f", help="Export format: json, csv"),
+):
     """
     Run the Arboric Autopilot demo with multiple AI workloads.
 
     Simulates scheduling 5 heavy AI training jobs and shows
     the aggregated impact of intelligent scheduling.
+
+    Export results: arboric demo --output fleet.json
     """
     print_banner()
     console.print()
@@ -454,6 +490,45 @@ minimum cost and carbon emissions.
 
     console.print()
 
+    # Calculate totals for fleet result
+    total_cost_saved_calc = sum(r.cost_savings for r in results)
+    total_carbon_saved_calc = sum(r.carbon_savings_kg for r in results)
+
+    # Create FleetOptimizationResult for export
+    fleet_result = FleetOptimizationResult(
+        schedules=results,
+        total_cost_savings=total_cost_saved_calc,
+        total_carbon_savings_kg=total_carbon_saved_calc,
+        total_workloads=len(results),
+    )
+
+    # Handle export if requested
+    if output:
+        from arboric.cli.export import ExportError, ExportFormat, detect_format, export_fleet_result
+
+        # Determine format
+        if format:
+            try:
+                export_format = ExportFormat(format.lower())
+            except ValueError:
+                console.print(f"[{ARBORIC_RED}]Invalid format '{format}'. Use 'json' or 'csv'.[/{ARBORIC_RED}]")
+                raise typer.Exit(1)
+        else:
+            export_format = detect_format(output)
+            if not export_format:
+                console.print(f"[{ARBORIC_RED}]Cannot detect format from '{output}'. Use --format flag.[/{ARBORIC_RED}]")
+                raise typer.Exit(1)
+
+        # Export
+        try:
+            export_fleet_result(fleet_result, output, export_format, command="demo")
+            if output != "-":
+                console.print(f"[{ARBORIC_GREEN}]✓ Exported to {output}[/{ARBORIC_GREEN}]")
+                console.print()
+        except ExportError as e:
+            console.print(f"[{ARBORIC_RED}]Export failed: {e}[/{ARBORIC_RED}]")
+            raise typer.Exit(1)
+
     # Show results table
     results_table = Table(
         title="[bold]Optimization Results",
@@ -567,11 +642,15 @@ minimum cost and carbon emissions.
 def forecast(
     region: str = typer.Option("US-WEST", "--region", "-r", help="Grid region"),
     hours: int = typer.Option(24, "--hours", "-h", help="Forecast hours"),
+    output: Optional[str] = typer.Option(None, "--output", "-o", help="Output file path (or '-' for stdout)"),
+    format: Optional[str] = typer.Option(None, "--format", "-f", help="Export format: json, csv"),
 ):
     """
     Display the current grid forecast for a region.
 
     Shows carbon intensity and pricing over the forecast horizon.
+
+    Export forecast: arboric forecast --output forecast.csv --region US-WEST --hours 24
     """
     print_banner()
     console.print()
@@ -581,6 +660,33 @@ def forecast(
 
     grid = MockGrid(region=region)
     forecast_df = grid.get_forecast(hours=hours)
+
+    # Handle export if requested
+    if output:
+        from arboric.cli.export import ExportError, ExportFormat, detect_format, export_forecast
+
+        # Determine format
+        if format:
+            try:
+                export_format = ExportFormat(format.lower())
+            except ValueError:
+                console.print(f"[{ARBORIC_RED}]Invalid format '{format}'. Use 'json' or 'csv'.[/{ARBORIC_RED}]")
+                raise typer.Exit(1)
+        else:
+            export_format = detect_format(output)
+            if not export_format:
+                console.print(f"[{ARBORIC_RED}]Cannot detect format from '{output}'. Use --format flag.[/{ARBORIC_RED}]")
+                raise typer.Exit(1)
+
+        # Export
+        try:
+            export_forecast(forecast_df, region, hours, output, export_format, command="forecast")
+            if output != "-":
+                console.print(f"[{ARBORIC_GREEN}]✓ Exported to {output}[/{ARBORIC_GREEN}]")
+                console.print()
+        except ExportError as e:
+            console.print(f"[{ARBORIC_RED}]Export failed: {e}[/{ARBORIC_RED}]")
+            raise typer.Exit(1)
 
     # Create forecast table
     table = Table(
