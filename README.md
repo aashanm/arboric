@@ -207,6 +207,83 @@ ruff check arboric
 
 ---
 
+## ⚙️ Configuration
+
+Arboric supports persistent configuration via `~/.arboric/config.yaml`. This allows you to set default values for workload parameters, optimization weights, and CLI preferences.
+
+### Creating a Configuration File
+
+```bash
+# Create default configuration
+arboric config init
+
+# View current configuration
+arboric config show
+
+# Edit configuration in your default editor
+arboric config edit
+
+# Show config file location
+arboric config path
+```
+
+### Configuration Options
+
+See [config.example.yaml](config.example.yaml) for a complete example with documentation.
+
+**Optimization Settings:**
+- `price_weight` (0-1): Weight for cost optimization (default: 0.7)
+- `carbon_weight` (0-1): Weight for carbon optimization (default: 0.3)
+- `min_delay_hours`: Minimum delay before starting workloads (default: 0.0)
+- `prefer_continuous`: Prefer continuous execution windows (default: true)
+
+**Default Workload Settings:**
+- `duration_hours`: Default workload duration (default: 4.0)
+- `power_draw_kw`: Default power draw in kW (default: 50.0)
+- `deadline_hours`: Default deadline (default: 12.0)
+- `region`: Default grid region (default: US-WEST)
+
+**CLI Settings:**
+- `show_banner`: Show ASCII banner on startup (default: true)
+- `color_theme`: Color theme (default, minimal, mono)
+- `quiet_mode`: Minimize output (default: false)
+- `auto_approve`: Skip confirmation prompts (default: false)
+
+**API Settings:**
+- `watttime_username`: WattTime API username
+- `watttime_password`: WattTime API password
+- `watttime_enabled`: Enable WattTime integration (default: false)
+
+### Example Configuration
+
+```yaml
+optimization:
+  price_weight: 0.6  # Slightly more cost-focused
+  carbon_weight: 0.4
+
+defaults:
+  duration_hours: 6.0
+  power_draw_kw: 100.0
+  deadline_hours: 24.0
+  region: US-WEST
+
+cli:
+  show_banner: true
+  quiet_mode: false
+```
+
+When CLI options are not specified, values from the config file will be used:
+
+```bash
+# Uses config defaults
+arboric optimize "My Job"
+
+# Override specific values
+arboric optimize "My Job" --duration 8 --region EU-WEST
+```
+
+---
+
 ### Running Tests
 ```bash
 # Run all tests

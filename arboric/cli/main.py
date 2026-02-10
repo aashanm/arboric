@@ -30,6 +30,7 @@ from rich.text import Text
 from arboric.core.autopilot import Autopilot, OptimizationConfig
 from arboric.core.grid_oracle import MockGrid
 from arboric.core.models import Workload, WorkloadType
+from arboric.core.config import ArboricConfig, get_config
 
 # Initialize Rich console
 console = Console()
@@ -210,18 +211,30 @@ def simulate_optimization_animation(workload_name: str, duration: float = 1.5):
 @app.command()
 def optimize(
     workload_name: str = typer.Argument(..., help="Name of the workload to optimize"),
-    duration: float = typer.Option(4.0, "--duration", "-d", help="Workload duration in hours"),
-    deadline: float = typer.Option(12.0, "--deadline", "-D", help="Must complete within hours"),
-    power: float = typer.Option(50.0, "--power", "-p", help="Power draw in kW"),
-    region: str = typer.Option("US-WEST", "--region", "-r", help="Grid region"),
+    duration: Optional[float] = typer.Option(None, "--duration", "-d", help="Workload duration in hours"),
+    deadline: Optional[float] = typer.Option(None, "--deadline", "-D", help="Must complete within hours"),
+    power: Optional[float] = typer.Option(None, "--power", "-p", help="Power draw in kW"),
+    region: Optional[str] = typer.Option(None, "--region", "-r", help="Grid region"),
     quiet: bool = typer.Option(False, "--quiet", "-q", help="Minimal output"),
 ):
     """
     Optimize a single workload for cost and carbon efficiency.
 
     Example: arboric optimize "LLM Training" --duration 6 --deadline 24
+
+    If options are not specified, values from ~/.arboric/config.yaml will be used.
     """
-    if not quiet:
+    # Load configuration for defaults
+    cfg = get_config()
+
+    # Use config defaults if not specified
+    duration = duration if duration is not None else cfg.defaults.duration_hours
+    deadline = deadline if deadline is not None else cfg.defaults.deadline_hours
+    power = power if power is not None else cfg.defaults.power_draw_kw
+    region = region if region is not None else cfg.defaults.region
+    quiet = quiet or cfg.cli.quiet_mode
+
+    if not quiet and cfg.cli.show_banner:
         print_banner()
         console.print()
 
@@ -258,7 +271,14 @@ def optimize(
     grid = MockGrid(region=region)
     forecast = grid.get_forecast(hours=int(deadline) + int(duration) + 2)
 
-    autopilot = Autopilot()
+    # Create autopilot with config-based optimization settings
+    opt_config = OptimizationConfig(
+        price_weight=cfg.optimization.price_weight,
+        carbon_weight=cfg.optimization.carbon_weight,
+        min_delay_hours=cfg.optimization.min_delay_hours,
+        prefer_continuous=cfg.optimization.prefer_continuous,
+    )
+    autopilot = Autopilot(config=opt_config)
     result = autopilot.optimize_schedule(workload, forecast)
 
     # Display events
@@ -657,6 +677,137 @@ def status():
     console.print()
 
     console.print("[dim]Run 'arboric --help' for available commands.[/dim]")
+
+
+@app.command()
+def config(
+    action: str = typer.Argument(..., help="Action: show, init, edit, path"),
+):
+    """
+    Manage Arboric configuration.
+
+    Actions:
+        show  - Display current configuration
+        init  - Create default config file
+        edit  - Open config file in editor
+        path  - Show config file path
+    """
+    config_path = ArboricConfig.get_config_path()
+
+    if action == "show":
+        # Display current configuration
+        try:
+            cfg = get_config()
+            console.print(f"\n[bold {ARBORIC_BLUE}]Arboric Configuration[/bold {ARBORIC_BLUE}]")
+            console.print(f"[dim]Loaded from: {config_path}[/dim]\n")
+
+            # Optimization settings
+            opt_table = Table(
+                title="Optimization Settings",
+                box=box.ROUNDED,
+                border_style=ARBORIC_GREEN,
+            )
+            opt_table.add_column("Setting", style="white")
+            opt_table.add_column("Value", style=f"bold {ARBORIC_GREEN}", justify="right")
+
+            opt_table.add_row("Price Weight", f"{cfg.optimization.price_weight:.1%}")
+            opt_table.add_row("Carbon Weight", f"{cfg.optimization.carbon_weight:.1%}")
+            opt_table.add_row("Min Delay (hours)", f"{cfg.optimization.min_delay_hours}")
+            opt_table.add_row("Prefer Continuous", str(cfg.optimization.prefer_continuous))
+            console.print(opt_table)
+            console.print()
+
+            # Default workload settings
+            default_table = Table(
+                title="Default Workload Settings",
+                box=box.ROUNDED,
+                border_style=ARBORIC_BLUE,
+            )
+            default_table.add_column("Setting", style="white")
+            default_table.add_column("Value", style=f"bold {ARBORIC_BLUE}", justify="right")
+
+            default_table.add_row("Duration", f"{cfg.defaults.duration_hours}h")
+            default_table.add_row("Power Draw", f"{cfg.defaults.power_draw_kw} kW")
+            default_table.add_row("Deadline", f"{cfg.defaults.deadline_hours}h")
+            default_table.add_row("Region", cfg.defaults.region)
+            console.print(default_table)
+            console.print()
+
+            # CLI settings
+            cli_table = Table(
+                title="CLI Settings",
+                box=box.ROUNDED,
+                border_style=ARBORIC_PURPLE,
+            )
+            cli_table.add_column("Setting", style="white")
+            cli_table.add_column("Value", style=f"bold {ARBORIC_PURPLE}", justify="right")
+
+            cli_table.add_row("Show Banner", str(cfg.cli.show_banner))
+            cli_table.add_row("Color Theme", cfg.cli.color_theme)
+            cli_table.add_row("Quiet Mode", str(cfg.cli.quiet_mode))
+            cli_table.add_row("Auto Approve", str(cfg.cli.auto_approve))
+            console.print(cli_table)
+            console.print()
+
+            # API settings
+            if cfg.api.watttime_enabled:
+                console.print(f"[{ARBORIC_GREEN}]✓[/{ARBORIC_GREEN}] WattTime API integration enabled")
+            else:
+                console.print(f"[{ARBORIC_AMBER}]○[/{ARBORIC_AMBER}] WattTime API integration disabled")
+            console.print()
+
+        except Exception as e:
+            console.print(f"[{ARBORIC_RED}]Error loading configuration: {e}[/{ARBORIC_RED}]")
+
+    elif action == "init":
+        # Create default config file
+        if config_path.exists():
+            console.print(f"[{ARBORIC_AMBER}]Config file already exists at:[/{ARBORIC_AMBER}]")
+            console.print(f"  {config_path}")
+            console.print(f"\n[dim]Use 'arboric config edit' to modify it.[/dim]")
+        else:
+            try:
+                cfg = ArboricConfig.create_default_config()
+                console.print(f"[{ARBORIC_GREEN}]✓[/{ARBORIC_GREEN}] Created default configuration at:")
+                console.print(f"  {config_path}")
+                console.print(f"\n[dim]Edit this file to customize your settings.[/dim]")
+            except Exception as e:
+                console.print(f"[{ARBORIC_RED}]Error creating config: {e}[/{ARBORIC_RED}]")
+
+    elif action == "edit":
+        # Open config file in editor
+        import os
+        import subprocess
+
+        if not config_path.exists():
+            console.print(f"[{ARBORIC_AMBER}]Config file doesn't exist. Creating default...[/{ARBORIC_AMBER}]")
+            ArboricConfig.create_default_config()
+
+        # Try to open in user's preferred editor
+        editor = os.environ.get('EDITOR', os.environ.get('VISUAL', 'nano'))
+        try:
+            subprocess.run([editor, str(config_path)], check=True)
+            console.print(f"[{ARBORIC_GREEN}]✓[/{ARBORIC_GREEN}] Configuration saved")
+        except FileNotFoundError:
+            console.print(f"[{ARBORIC_AMBER}]Editor '{editor}' not found. Config file location:[/{ARBORIC_AMBER}]")
+            console.print(f"  {config_path}")
+        except Exception as e:
+            console.print(f"[{ARBORIC_RED}]Error opening editor: {e}[/{ARBORIC_RED}]")
+
+    elif action == "path":
+        # Show config file path
+        if config_path.exists():
+            console.print(f"[{ARBORIC_GREEN}]Configuration file:[/{ARBORIC_GREEN}]")
+            console.print(f"  {config_path}")
+            console.print(f"\n[dim]Use 'arboric config edit' to modify it.[/dim]")
+        else:
+            console.print(f"[{ARBORIC_AMBER}]No configuration file found.[/{ARBORIC_AMBER}]")
+            console.print(f"Expected location: {config_path}")
+            console.print(f"\n[dim]Use 'arboric config init' to create one.[/dim]")
+
+    else:
+        console.print(f"[{ARBORIC_RED}]Unknown action: {action}[/{ARBORIC_RED}]")
+        console.print(f"\nAvailable actions: show, init, edit, path")
 
 
 def main():

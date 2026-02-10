@@ -1,0 +1,59 @@
+# Arboric Configuration Example
+# Copy this file to ~/.arboric/config.yaml and customize as needed
+
+# Optimization algorithm settings
+optimization:
+  # Weight for cost optimization (0-1)
+  # Higher values prioritize electricity cost savings
+  price_weight: 0.7
+
+  # Weight for carbon optimization (0-1)
+  # Higher values prioritize carbon emission reduction
+  # Note: price_weight + carbon_weight must equal 1.0
+  carbon_weight: 0.3
+
+  # Minimum delay before starting workloads (hours)
+  # Useful if you need setup/preparation time
+  min_delay_hours: 0.0
+
+  # Prefer continuous execution windows over fragmented ones
+  prefer_continuous: true
+
+# Default workload settings
+# These values are used when options are not specified in CLI commands
+defaults:
+  # Default workload duration in hours
+  duration_hours: 4.0
+
+  # Default power draw in kilowatts
+  power_draw_kw: 50.0
+
+  # Default deadline in hours (must be >= duration)
+  deadline_hours: 12.0
+
+  # Default grid region
+  # Options: US-WEST, US-EAST, EU-WEST, NORDIC
+  region: US-WEST
+
+# External API integration settings
+api:
+  # WattTime API credentials (for real-time carbon data)
+  # Leave empty to use MockGrid simulation
+  watttime_username: null
+  watttime_password: null
+  watttime_enabled: false
+
+# CLI display and behavior settings
+cli:
+  # Show ASCII banner on startup
+  show_banner: true
+
+  # Color theme for terminal output
+  # Options: default, minimal, mono
+  color_theme: default
+
+  # Minimize output (overrides show_banner)
+  quiet_mode: false
+
+  # Skip confirmation prompts (use with caution)
+  auto_approve: false

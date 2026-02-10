@@ -15,6 +15,15 @@ from arboric.core.models import (
 )
 from arboric.core.grid_oracle import MockGrid, get_grid
 from arboric.core.autopilot import Autopilot, OptimizationConfig, create_autopilot
+from arboric.core.config import (
+    ArboricConfig,
+    OptimizationSettings,
+    DefaultWorkloadSettings,
+    APISettings,
+    CLISettings,
+    get_config,
+    reset_config,
+)
 
 __all__ = [
     # Models
@@ -31,4 +40,12 @@ __all__ = [
     "Autopilot",
     "OptimizationConfig",
     "create_autopilot",
+    # Configuration
+    "ArboricConfig",
+    "OptimizationSettings",
+    "DefaultWorkloadSettings",
+    "APISettings",
+    "CLISettings",
+    "get_config",
+    "reset_config",
 ]
