@@ -34,6 +34,10 @@ pip install arboric
 # Optimize a single workload
 arboric optimize "LLM Training" --duration 6 --deadline 24 --power 120
 
+# Export results to JSON or CSV
+arboric optimize "LLM Training" --duration 6 --output results.json
+arboric demo --output fleet.csv
+
 # Run the interactive demo
 arboric demo
 
