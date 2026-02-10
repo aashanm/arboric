@@ -2,8 +2,7 @@
 Arboric CLI
 
 The command-line interface for Arboric - intelligent workload scheduling
-for cost and carbon optimization. Built with Typer and Rich for a
-polished, investor-ready demo experience.
+for cost and carbon optimization. Built with Typer and Rich.
 """
 
 import time
@@ -28,9 +27,9 @@ from rich.style import Style
 from rich.table import Table
 from rich.text import Text
 
-from arboric.autopilot import Autopilot, OptimizationConfig
-from arboric.grid_oracle import MockGrid
-from arboric.models import Workload, WorkloadType
+from arboric.core.autopilot import Autopilot, OptimizationConfig
+from arboric.core.grid_oracle import MockGrid
+from arboric.core.models import Workload, WorkloadType
 
 # Initialize Rich console
 console = Console()
@@ -56,12 +55,12 @@ def print_banner():
     banner = """
     ╔═══════════════════════════════════════════════════════════════╗
     ║                                                               ║
-    ║     █████╗ ██████╗ ██████╗  ██████╗ ██████╗ ██╗ ██████╗      ║
-    ║    ██╔══██╗██╔══██╗██╔══██╗██╔═══██╗██╔══██╗██║██╔════╝      ║
-    ║    ███████║██████╔╝██████╔╝██║   ██║██████╔╝██║██║           ║
-    ║    ██╔══██║██╔══██╗██╔══██╗██║   ██║██╔══██╗██║██║           ║
-    ║    ██║  ██║██║  ██║██████╔╝╚██████╔╝██║  ██║██║╚██████╗      ║
-    ║    ╚═╝  ╚═╝╚═╝  ╚═╝╚═════╝  ╚═════╝ ╚═╝  ╚═╝╚═╝ ╚═════╝      ║
+    ║     █████╗ ██████╗ ██████╗  ██████╗ ██████╗ ██╗ ██████╗       ║
+    ║    ██╔══██╗██╔══██╗██╔══██╗██╔═══██╗██╔══██╗██║██╔════╝       ║
+    ║    ███████║██████╔╝██████╔╝██║   ██║██████╔╝██║██║            ║
+    ║    ██╔══██║██╔══██╗██╔══██╗██║   ██║██╔══██╗██║██║            ║
+    ║    ██║  ██║██║  ██║██████╔╝╚██████╔╝██║  ██║██║╚██████╗       ║
+    ║    ╚═╝  ╚═╝╚═╝  ╚═╝╚═════╝  ╚═════╝ ╚═╝  ╚═╝╚═╝ ╚═════╝       ║
     ║                                                               ║
     ║           Intelligent Autopilot for Cloud Infrastructure      ║
     ║                  Harvest Optimal Energy Windows               ║

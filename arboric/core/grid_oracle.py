@@ -18,7 +18,7 @@ from typing import Optional
 
 import pandas as pd
 
-from arboric.models import GridWindow
+from arboric.core.models import GridWindow
 
 
 # Regional grid profiles (baseline characteristics)

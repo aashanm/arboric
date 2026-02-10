@@ -5,7 +5,10 @@
       "Bash(python3 -m pip install:*)",
       "Bash(python3:*)",
       "Bash(source:*)",
-      "Bash(PYTHONPATH=/Users/ameiyappan/arboric python3:*)"
+      "Bash(PYTHONPATH=/Users/ameiyappan/arboric python3:*)",
+      "Bash(python -m arboric.cli.main:*)",
+      "Bash(python -m pytest:*)",
+      "Bash(cat:*)"
     ]
   }
 }

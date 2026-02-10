@@ -16,7 +16,7 @@ from typing import Optional
 
 import pandas as pd
 
-from arboric.models import (
+from arboric.core.models import (
     FleetOptimizationResult,
     ScheduleResult,
     Workload,

@@ -54,7 +54,7 @@ dev = [
 ]
 
 [project.scripts]
-arboric = "arboric.cli:main"
+arboric = "arboric.cli.main:main"
 
 [project.urls]
 Homepage = "https://github.com/arboric/arboric"
