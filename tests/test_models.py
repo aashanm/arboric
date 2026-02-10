@@ -13,6 +13,7 @@ from arboric.core.models import (
     GridWindow,
     ScheduleResult,
     Workload,
+    WorkloadDependency,
     WorkloadPriority,
     WorkloadType,
 )
@@ -83,6 +84,104 @@ class TestWorkload:
         assert workload.workload_type == WorkloadType.GENERIC
         assert workload.priority == WorkloadPriority.NORMAL
         assert workload.description is None
+
+    def test_workload_with_no_dependencies(self):
+        """Test workload defaults to empty dependencies list."""
+        workload = Workload(
+            name="No Dependencies",
+            duration_hours=4.0,
+            power_draw_kw=50.0,
+            deadline_hours=12.0,
+        )
+        assert workload.dependencies == []
+
+    def test_workload_with_single_dependency(self):
+        """Test workload with one dependency."""
+        from uuid import UUID
+
+        dep_id = UUID("12345678-1234-5678-1234-567812345678")
+        dependency = WorkloadDependency(
+            source_workload_id=dep_id,
+            depends_on_completion=True,
+            min_delay_hours=0.0,
+        )
+        workload = Workload(
+            name="Dependent Job",
+            duration_hours=4.0,
+            power_draw_kw=50.0,
+            deadline_hours=12.0,
+            dependencies=[dependency],
+        )
+        assert len(workload.dependencies) == 1
+        assert workload.dependencies[0].source_workload_id == dep_id
+
+    def test_workload_with_multiple_dependencies(self):
+        """Test workload with multiple dependencies."""
+        dep1 = WorkloadDependency(source_workload_id="11111111-1111-1111-1111-111111111111")
+        dep2 = WorkloadDependency(source_workload_id="22222222-2222-2222-2222-222222222222")
+        workload = Workload(
+            name="Multi-Dependent",
+            duration_hours=4.0,
+            power_draw_kw=50.0,
+            deadline_hours=12.0,
+            dependencies=[dep1, dep2],
+        )
+        assert len(workload.dependencies) == 2
+
+
+class TestWorkloadDependency:
+    """Test cases for WorkloadDependency model."""
+
+    def test_valid_dependency_creation(self):
+        """Test creating a valid dependency."""
+        dep = WorkloadDependency(
+            source_workload_id="12345678-1234-5678-1234-567812345678",
+            depends_on_completion=True,
+            min_delay_hours=1.5,
+        )
+        assert str(dep.source_workload_id) == "12345678-1234-5678-1234-567812345678"
+        assert dep.depends_on_completion is True
+        assert dep.min_delay_hours == 1.5
+
+    def test_dependency_defaults(self):
+        """Test default values for dependency fields."""
+        dep = WorkloadDependency(
+            source_workload_id="12345678-1234-5678-1234-567812345678"
+        )
+        assert dep.depends_on_completion is True
+        assert dep.min_delay_hours == 0.0
+
+    def test_negative_min_delay_rejected(self):
+        """Test that negative min_delay_hours is rejected."""
+        with pytest.raises(ValueError):
+            WorkloadDependency(
+                source_workload_id="12345678-1234-5678-1234-567812345678",
+                min_delay_hours=-1.0,
+            )
+
+    def test_excessive_min_delay_rejected(self):
+        """Test that min_delay_hours > 168 is rejected."""
+        with pytest.raises(ValueError):
+            WorkloadDependency(
+                source_workload_id="12345678-1234-5678-1234-567812345678",
+                min_delay_hours=169.0,
+            )
+
+    def test_min_delay_boundary_values(self):
+        """Test boundary values for min_delay_hours."""
+        # Test 0.0 (minimum valid)
+        dep_min = WorkloadDependency(
+            source_workload_id="12345678-1234-5678-1234-567812345678",
+            min_delay_hours=0.0,
+        )
+        assert dep_min.min_delay_hours == 0.0
+
+        # Test 168.0 (maximum valid)
+        dep_max = WorkloadDependency(
+            source_workload_id="12345678-1234-5678-1234-567812345678",
+            min_delay_hours=168.0,
+        )
+        assert dep_max.min_delay_hours == 168.0
 
 
 class TestGridWindow:
