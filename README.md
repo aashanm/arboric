@@ -207,36 +207,6 @@ ruff check arboric
 
 ---
 
-## 💻 Usage Examples
-
-### Command-Line Interface
-
-**Optimize a single workload:**
-```bash
-arboric optimize "Daily ETL Pipeline" \
-  --duration 2 \
-  --deadline 12 \
-  --power 40 \
-  --region US-WEST
-```
-
-**View grid forecast:**
-```bash
-arboric forecast --region EU-WEST --hours 48
-```
-
-**Run the demo:**
-```bash
-arboric demo
-```
-
-**Check system status:**
-```bash
-arboric status
-```
-
----
-
 ### Running Tests
 ```bash
 # Run all tests
