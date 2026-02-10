@@ -65,6 +65,121 @@ arboric forecast --region US-WEST --hours 24
 
 ---
 
+## 🌐 API Server
+
+Arboric provides a REST API for integration with orchestration tools like Airflow, Prefect, and Dagster.
+
+### Starting the API Server
+
+```bash
+# Start API server
+arboric api
+
+# Custom host and port
+arboric api --host 0.0.0.0 --port 8000
+
+# Development mode with auto-reload
+arboric api --reload
+
+# Production with multiple workers
+arboric api --host 0.0.0.0 --port 8000 --workers 4
+```
+
+The API provides interactive documentation at:
+- **Swagger UI**: http://localhost:8000/docs
+- **ReDoc**: http://localhost:8000/redoc
+
+### API Examples
+
+**Optimize a single workload:**
+```bash
+curl -X POST "http://localhost:8000/api/v1/optimize" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "workload": {
+      "name": "LLM Training",
+      "duration_hours": 8,
+      "power_draw_kw": 120,
+      "deadline_hours": 24
+    },
+    "region": "US-WEST"
+  }'
+```
+
+**Get grid forecast:**
+```bash
+curl "http://localhost:8000/api/v1/forecast?region=US-WEST&hours=24"
+```
+
+**Health check:**
+```bash
+curl "http://localhost:8000/api/v1/health"
+```
+
+### Integration with Airflow
+
+```python
+from airflow.providers.http.operators.http import SimpleHttpOperator
+import json
+
+optimize_task = SimpleHttpOperator(
+    task_id='optimize_workload',
+    http_conn_id='arboric_api',
+    endpoint='/api/v1/optimize',
+    method='POST',
+    data=json.dumps({
+        "workload": {
+            "name": "Daily ETL",
+            "duration_hours": 2,
+            "power_draw_kw": 40,
+            "deadline_hours": 12
+        }
+    }),
+    headers={"Content-Type": "application/json"}
+)
+```
+
+### Integration with Prefect
+
+```python
+from prefect import flow, task
+import httpx
+
+@task
+def optimize_workload(name: str, duration: float, power: float, deadline: float):
+    """Optimize workload via Arboric API."""
+    response = httpx.post(
+        "http://localhost:8000/api/v1/optimize",
+        json={
+            "workload": {
+                "name": name,
+                "duration_hours": duration,
+                "power_draw_kw": power,
+                "deadline_hours": deadline
+            }
+        }
+    )
+    return response.json()
+
+@flow
+def data_pipeline():
+    result = optimize_workload("ETL Job", 2.0, 40.0, 12.0)
+    print(f"Cost savings: ${result['data']['metrics']['savings']['cost']:.2f}")
+```
+
+### Available Endpoints
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/v1/optimize` | POST | Optimize a single workload |
+| `/api/v1/fleet/optimize` | POST | Optimize multiple workloads |
+| `/api/v1/forecast` | GET | Get grid forecast data |
+| `/api/v1/status` | GET | System status and health |
+| `/api/v1/config` | GET | Current configuration |
+| `/api/v1/health` | GET | Health check |
+
+---
+
 ## ⚡ Features
 
 ### Core Capabilities

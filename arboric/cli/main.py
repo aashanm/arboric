@@ -916,6 +916,48 @@ def config(
         console.print(f"\nAvailable actions: show, init, edit, path")
 
 
+@app.command()
+def api(
+    host: str = typer.Option("127.0.0.1", "--host", "-h", help="Host to bind to"),
+    port: int = typer.Option(8000, "--port", "-p", help="Port to bind to"),
+    reload: bool = typer.Option(False, "--reload", help="Enable auto-reload for development"),
+    workers: int = typer.Option(1, "--workers", "-w", help="Number of worker processes"),
+):
+    """
+    Start the Arboric REST API server.
+
+    The API provides HTTP endpoints for workload optimization, enabling
+    integration with orchestration tools like Airflow, Prefect, and Dagster.
+
+    Example: arboric api --host 0.0.0.0 --port 8000 --reload
+
+    Once started, visit http://localhost:8000/docs for interactive API documentation.
+    """
+    import uvicorn
+
+    console.print(f"[{ARBORIC_GREEN}]🚀 Starting Arboric API server...[/{ARBORIC_GREEN}]")
+    console.print()
+    console.print(f"  Host:     {host}")
+    console.print(f"  Port:     {port}")
+    console.print(f"  Workers:  {workers}")
+    console.print(f"  Docs:     http://{host}:{port}/docs")
+    console.print(f"  Health:   http://{host}:{port}/api/v1/health")
+    console.print()
+
+    if reload:
+        console.print(f"[{ARBORIC_AMBER}]⚠️  Auto-reload enabled (development mode)[/{ARBORIC_AMBER}]")
+        console.print()
+
+    uvicorn.run(
+        "arboric.api.main:app",
+        host=host,
+        port=port,
+        reload=reload,
+        workers=workers if not reload else 1,  # reload requires single worker
+        log_level="info",
+    )
+
+
 def main():
     """Entry point for the CLI."""
     app()
