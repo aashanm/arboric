@@ -4,8 +4,6 @@ API request models.
 Pydantic models for validating incoming API requests.
 """
 
-from typing import Optional
-
 from pydantic import BaseModel, Field, model_validator
 
 from arboric.core.models import Workload
@@ -14,9 +12,15 @@ from arboric.core.models import Workload
 class OptimizationConfigRequest(BaseModel):
     """API request model for optimization configuration."""
 
-    price_weight: float = Field(default=0.7, ge=0.0, le=1.0, description="Weight for price optimization (0-1)")
-    carbon_weight: float = Field(default=0.3, ge=0.0, le=1.0, description="Weight for carbon optimization (0-1)")
-    min_delay_hours: float = Field(default=0.0, ge=0.0, description="Minimum delay before starting workload")
+    price_weight: float = Field(
+        default=0.7, ge=0.0, le=1.0, description="Weight for price optimization (0-1)"
+    )
+    carbon_weight: float = Field(
+        default=0.3, ge=0.0, le=1.0, description="Weight for carbon optimization (0-1)"
+    )
+    min_delay_hours: float = Field(
+        default=0.0, ge=0.0, description="Minimum delay before starting workload"
+    )
     prefer_continuous: bool = Field(default=True, description="Prefer continuous execution windows")
 
     @model_validator(mode="after")
@@ -33,10 +37,10 @@ class OptimizeRequest(BaseModel):
 
     workload: Workload = Field(..., description="Workload to optimize")
     region: str = Field(default="US-WEST", description="Grid region for optimization")
-    optimization_config: Optional[OptimizationConfigRequest] = Field(
+    optimization_config: OptimizationConfigRequest | None = Field(
         None, description="Optional optimization configuration override"
     )
-    forecast_hours: Optional[int] = Field(
+    forecast_hours: int | None = Field(
         None, ge=1, le=168, description="Forecast horizon in hours (1-168)"
     )
 
@@ -48,9 +52,9 @@ class FleetOptimizeRequest(BaseModel):
         ..., min_length=1, max_length=100, description="List of workloads to optimize (1-100)"
     )
     region: str = Field(default="US-WEST", description="Grid region for optimization")
-    optimization_config: Optional[OptimizationConfigRequest] = Field(
+    optimization_config: OptimizationConfigRequest | None = Field(
         None, description="Optional optimization configuration override"
     )
-    forecast_hours: Optional[int] = Field(
+    forecast_hours: int | None = Field(
         None, ge=1, le=168, description="Forecast horizon in hours (1-168)"
     )

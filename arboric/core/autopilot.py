@@ -11,8 +11,7 @@ Architecture:
 - Future: constraint satisfaction for multi-workload dependencies
 """
 
-from datetime import datetime, timedelta
-from typing import Optional
+from datetime import timedelta
 
 import pandas as pd
 
@@ -22,7 +21,6 @@ from arboric.core.models import (
     Workload,
     WorkloadPriority,
 )
-
 
 # Optimization weights (configurable per deployment)
 # Cost-first strategy: prioritize dollar savings, use carbon as tie-breaker
@@ -66,7 +64,7 @@ class Autopilot:
     based on a weighted combination of cost and carbon metrics.
     """
 
-    def __init__(self, config: Optional[OptimizationConfig] = None):
+    def __init__(self, config: OptimizationConfig | None = None):
         self.config = config or OptimizationConfig()
         self._optimization_log: list[str] = []
 
@@ -94,11 +92,11 @@ class Autopilot:
             Tuple of (composite_score, total_cost, total_carbon_kg)
         """
         if forecast_slice.empty:
-            return float('inf'), 0, 0
+            return float("inf"), 0, 0
 
         # Calculate metrics for this window
-        avg_price = forecast_slice['price'].mean()
-        avg_carbon = forecast_slice['co2_intensity'].mean()
+        avg_price = forecast_slice["price"].mean()
+        avg_carbon = forecast_slice["co2_intensity"].mean()
 
         # Total cost = price * energy
         energy_kwh = workload.energy_kwh
@@ -116,8 +114,8 @@ class Autopilot:
 
         # Weighted composite score (lower is better)
         composite = (
-            price_normalized * self.config.price_weight +
-            carbon_normalized * self.config.carbon_weight
+            price_normalized * self.config.price_weight
+            + carbon_normalized * self.config.carbon_weight
         )
 
         return composite, total_cost, total_carbon_kg
@@ -186,12 +184,12 @@ class Autopilot:
                 baseline_end=baseline_start + timedelta(hours=workload.duration_hours),
                 optimized_cost=baseline_cost,
                 optimized_carbon_kg=baseline_carbon,
-                optimized_avg_price=baseline_slice['price'].mean(),
-                optimized_avg_carbon=baseline_slice['co2_intensity'].mean(),
+                optimized_avg_price=baseline_slice["price"].mean(),
+                optimized_avg_carbon=baseline_slice["co2_intensity"].mean(),
                 baseline_cost=baseline_cost,
                 baseline_carbon_kg=baseline_carbon,
-                baseline_avg_price=baseline_slice['price'].mean(),
-                baseline_avg_carbon=baseline_slice['co2_intensity'].mean(),
+                baseline_avg_price=baseline_slice["price"].mean(),
+                baseline_avg_carbon=baseline_slice["co2_intensity"].mean(),
             )
 
         # Calculate baseline (immediate start)
@@ -199,13 +197,15 @@ class Autopilot:
         baseline_score, baseline_cost, baseline_carbon = self._calculate_window_score(
             baseline_slice, workload
         )
-        baseline_avg_price = baseline_slice['price'].mean()
-        baseline_avg_carbon = baseline_slice['co2_intensity'].mean()
+        baseline_avg_price = baseline_slice["price"].mean()
+        baseline_avg_carbon = baseline_slice["co2_intensity"].mean()
 
-        self._log(f"Baseline score: {baseline_score:.2f} (${baseline_cost:.2f}, {baseline_carbon:.2f}kg CO2)")
+        self._log(
+            f"Baseline score: {baseline_score:.2f} (${baseline_cost:.2f}, {baseline_carbon:.2f}kg CO2)"
+        )
 
         # Scan all feasible start times
-        best_score = float('inf')
+        best_score = float("inf")
         best_start_idx = 0
         best_cost = baseline_cost
         best_carbon = baseline_carbon
@@ -245,7 +245,7 @@ class Autopilot:
         # Find optimal window details
         optimal_start = forecast_df.index[best_start_idx]
         optimal_end = optimal_start + timedelta(hours=workload.duration_hours)
-        optimal_slice = forecast_df.iloc[best_start_idx:best_start_idx + windows_needed]
+        optimal_slice = forecast_df.iloc[best_start_idx : best_start_idx + windows_needed]
 
         self._log(f"Optimal start: {optimal_start.strftime('%Y-%m-%d %H:%M')}")
         self._log(f"Optimal score: {best_score:.2f} (${best_cost:.2f}, {best_carbon:.2f}kg CO2)")
@@ -262,8 +262,8 @@ class Autopilot:
             baseline_end=baseline_start + timedelta(hours=workload.duration_hours),
             optimized_cost=best_cost,
             optimized_carbon_kg=best_carbon,
-            optimized_avg_price=optimal_slice['price'].mean(),
-            optimized_avg_carbon=optimal_slice['co2_intensity'].mean(),
+            optimized_avg_price=optimal_slice["price"].mean(),
+            optimized_avg_carbon=optimal_slice["co2_intensity"].mean(),
             baseline_cost=baseline_cost,
             baseline_carbon_kg=baseline_carbon,
             baseline_avg_price=baseline_avg_price,

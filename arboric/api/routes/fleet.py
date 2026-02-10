@@ -9,7 +9,6 @@ from arboric.api.models.requests import FleetOptimizeRequest
 from arboric.api.utils import create_api_response, serialize_fleet_for_api
 from arboric.core.autopilot import Autopilot
 from arboric.core.grid_oracle import MockGrid
-from arboric.core.models import FleetOptimizationResult
 
 router = APIRouter()
 

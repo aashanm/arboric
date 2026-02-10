@@ -10,9 +10,7 @@ import json
 import sys
 from datetime import datetime
 from enum import Enum
-from io import StringIO
 from pathlib import Path
-from typing import Optional, TextIO, Union
 
 import pandas as pd
 
@@ -32,7 +30,7 @@ class ExportError(Exception):
     pass
 
 
-def detect_format(output_path: str) -> Optional[ExportFormat]:
+def detect_format(output_path: str) -> ExportFormat | None:
     """
     Auto-detect export format from file extension.
 
@@ -101,9 +99,7 @@ def _serialize_fleet_result(result: FleetOptimizationResult) -> dict:
     base_dict["average_carbon_savings_percent"] = result.average_carbon_savings_percent
 
     # Serialize nested schedules with their computed properties
-    base_dict["schedules"] = [
-        _serialize_schedule_result(schedule) for schedule in result.schedules
-    ]
+    base_dict["schedules"] = [_serialize_schedule_result(schedule) for schedule in result.schedules]
 
     return base_dict
 
@@ -181,9 +177,7 @@ def _fleet_to_json(result: FleetOptimizationResult, command: str = "demo") -> di
                 "total_cost_savings": data["total_cost_savings"],
                 "total_carbon_savings_kg": data["total_carbon_savings_kg"],
                 "average_cost_savings_percent": data["average_cost_savings_percent"],
-                "average_carbon_savings_percent": data[
-                    "average_carbon_savings_percent"
-                ],
+                "average_carbon_savings_percent": data["average_carbon_savings_percent"],
                 "optimization_timestamp": data["optimization_timestamp"],
             },
             "schedules": [
@@ -288,7 +282,7 @@ def _fleet_to_csv_rows(result: FleetOptimizationResult, command: str = "demo") -
 
 def export_schedule_result(
     result: ScheduleResult,
-    output: Union[str, Path],
+    output: str | Path,
     format: ExportFormat,
     command: str = "optimize",
 ) -> None:
@@ -342,7 +336,7 @@ def export_schedule_result(
 
 def export_fleet_result(
     result: FleetOptimizationResult,
-    output: Union[str, Path],
+    output: str | Path,
     format: ExportFormat,
     command: str = "demo",
 ) -> None:
@@ -414,7 +408,7 @@ def export_forecast(
     forecast_df: pd.DataFrame,
     region: str,
     hours: int,
-    output: Union[str, Path],
+    output: str | Path,
     format: ExportFormat,
     command: str = "forecast",
 ) -> None:

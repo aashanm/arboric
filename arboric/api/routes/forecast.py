@@ -2,8 +2,6 @@
 Grid forecast endpoint.
 """
 
-from typing import Optional
-
 from fastapi import APIRouter, HTTPException, Query, status
 
 from arboric.api.utils import create_api_response

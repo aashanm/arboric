@@ -4,11 +4,9 @@ Tests for Arboric Export Functionality
 Tests format detection, JSON/CSV serialization, and file I/O.
 """
 
-import json
 import csv
+import json
 from datetime import datetime, timedelta
-from io import StringIO
-from pathlib import Path
 
 import pandas as pd
 import pytest
@@ -17,16 +15,16 @@ from arboric.cli.export import (
     ExportError,
     ExportFormat,
     detect_format,
-    export_schedule_result,
     export_fleet_result,
     export_forecast,
+    export_schedule_result,
 )
 from arboric.core.models import (
-    Workload,
-    WorkloadType,
-    WorkloadPriority,
-    ScheduleResult,
     FleetOptimizationResult,
+    ScheduleResult,
+    Workload,
+    WorkloadPriority,
+    WorkloadType,
 )
 
 
@@ -189,7 +187,7 @@ class TestFleetResultExport:
 
         for i in range(3):
             workload = Workload(
-                name=f"Job {i+1}",
+                name=f"Job {i + 1}",
                 duration_hours=2.0,
                 power_draw_kw=30.0,
                 deadline_hours=12.0,

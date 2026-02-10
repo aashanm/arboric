@@ -14,22 +14,20 @@ In production, this module would integrate with:
 import math
 import random
 from datetime import datetime, timedelta
-from typing import Optional
 
 import pandas as pd
 
 from arboric.core.models import GridWindow
 
-
 # Regional grid profiles (baseline characteristics)
 REGION_PROFILES = {
     "US-WEST": {
-        "base_carbon": 350,      # gCO2/kWh
+        "base_carbon": 350,  # gCO2/kWh
         "carbon_amplitude": 200,  # Swing from solar
-        "base_price": 0.12,      # $/kWh
+        "base_price": 0.12,  # $/kWh
         "price_amplitude": 0.08,
-        "solar_peak_hour": 13,   # 1 PM
-        "price_peak_hour": 18,   # 6 PM (evening ramp)
+        "solar_peak_hour": 13,  # 1 PM
+        "price_peak_hour": 18,  # 6 PM (evening ramp)
         "timezone_offset": -8,
     },
     "US-EAST": {
@@ -51,7 +49,7 @@ REGION_PROFILES = {
         "timezone_offset": 1,
     },
     "NORDIC": {
-        "base_carbon": 80,       # Hydro-dominated
+        "base_carbon": 80,  # Hydro-dominated
         "carbon_amplitude": 40,
         "base_price": 0.08,
         "price_amplitude": 0.04,
@@ -74,7 +72,7 @@ class MockGrid:
     to produce realistic, varied forecasts for demo purposes.
     """
 
-    def __init__(self, region: str = "US-WEST", seed: Optional[int] = None):
+    def __init__(self, region: str = "US-WEST", seed: int | None = None):
         """
         Initialize the grid simulator.
 
@@ -88,13 +86,13 @@ class MockGrid:
 
         self.profile = REGION_PROFILES[region]
 
-        if seed is not None:
-            random.seed(seed)
+        # Use instance-specific random generator for reproducible results
+        self._random = random.Random(seed)
 
         # Add daily variation factors
-        self._daily_carbon_shift = random.uniform(-30, 30)
-        self._daily_price_shift = random.uniform(-0.02, 0.02)
-        self._weather_factor = random.uniform(0.8, 1.2)  # Cloud cover impact
+        self._daily_carbon_shift = self._random.uniform(-30, 30)
+        self._daily_price_shift = self._random.uniform(-0.02, 0.02)
+        self._weather_factor = self._random.uniform(0.8, 1.2)  # Cloud cover impact
 
     def _calculate_solar_factor(self, hour: float) -> float:
         """
@@ -108,7 +106,7 @@ class MockGrid:
 
         # Gaussian-shaped solar curve - strongest 11 AM to 3 PM
         solar_width = 2.5  # Controls the width of the peak window
-        solar_factor = math.exp(-((hour - solar_peak) ** 2) / (2 * solar_width ** 2))
+        solar_factor = math.exp(-((hour - solar_peak) ** 2) / (2 * solar_width**2))
 
         # Apply weather variation
         solar_factor *= self._weather_factor
@@ -142,7 +140,7 @@ class MockGrid:
         evening_component = 0
         if 16 <= hour <= 22:
             evening_distance = abs(hour - evening_peak)
-            evening_component = 120 * math.exp(-(evening_distance ** 2) / (2 * evening_width ** 2))
+            evening_component = 120 * math.exp(-(evening_distance**2) / (2 * evening_width**2))
 
         # Night baseline bump (less wind, no solar)
         night_component = 0
@@ -150,9 +148,16 @@ class MockGrid:
             night_component = 80
 
         # Random noise (reduced for more predictable demo)
-        noise = random.gauss(0, 10)
+        noise = self._random.gauss(0, 10)
 
-        intensity = base - solar_reduction + evening_component + night_component + self._daily_carbon_shift + noise
+        intensity = (
+            base
+            - solar_reduction
+            + evening_component
+            + night_component
+            + self._daily_carbon_shift
+            + noise
+        )
         return max(50, min(800, intensity))  # Clamp to realistic range
 
     def _calculate_price(self, hour: float) -> float:
@@ -181,7 +186,9 @@ class MockGrid:
         evening_component = 0
         if 15 <= hour <= 22:
             evening_distance = abs(hour - evening_peak)
-            evening_component = amplitude * 1.2 * math.exp(-(evening_distance ** 2) / (2 * evening_width ** 2))
+            evening_component = (
+                amplitude * 1.2 * math.exp(-(evening_distance**2) / (2 * evening_width**2))
+            )
 
         # Night baseline (moderate - neither peak nor solar)
         night_component = 0
@@ -189,9 +196,16 @@ class MockGrid:
             night_component = amplitude * 0.3
 
         # Random market noise (reduced for predictable demo)
-        noise = random.gauss(0, 0.005)
+        noise = self._random.gauss(0, 0.005)
 
-        price = base - solar_price_reduction + evening_component + night_component + self._daily_price_shift + noise
+        price = (
+            base
+            - solar_price_reduction
+            + evening_component
+            + night_component
+            + self._daily_price_shift
+            + noise
+        )
         return max(0.02, min(0.50, price))  # Clamp to realistic range
 
     def _calculate_renewable_percentage(self, hour: float) -> float:
@@ -202,14 +216,14 @@ class MockGrid:
         solar = 40 * self._weather_factor * max(0, math.cos(2 * math.pi * (hour - solar_peak) / 24))
 
         # Wind contribution (slightly higher at night in many regions)
-        wind_base = 15 + random.uniform(-5, 5)
+        wind_base = 15 + self._random.uniform(-5, 5)
         wind = wind_base + 10 * math.cos(2 * math.pi * (hour - 4) / 24)  # Peaks around 4am
 
         # Base hydro/nuclear (constant)
         base_renewable = 10 if self.region != "NORDIC" else 60
 
         total = base_renewable + solar + max(0, wind)
-        return min(95, max(5, total + random.gauss(0, 3)))
+        return min(95, max(5, total + self._random.gauss(0, 3)))
 
     def get_forecast(self, hours: int = 24, resolution_minutes: int = 60) -> pd.DataFrame:
         """
@@ -232,12 +246,16 @@ class MockGrid:
             hour_of_day = timestamp.hour + timestamp.minute / 60
 
             # Add slight trend drift for longer forecasts
-            trend_factor = 1 + (i / intervals) * random.uniform(-0.05, 0.05)
+            trend_factor = 1 + (i / intervals) * self._random.uniform(-0.05, 0.05)
+
+            # Calculate values with trend factor and ensure they stay in valid ranges
+            co2 = self._calculate_carbon_intensity(hour_of_day) * trend_factor
+            price = self._calculate_price(hour_of_day) * trend_factor
 
             window = GridWindow(
                 timestamp=timestamp,
-                co2_intensity=self._calculate_carbon_intensity(hour_of_day) * trend_factor,
-                price=self._calculate_price(hour_of_day) * trend_factor,
+                co2_intensity=max(50, min(800, co2)),  # Re-clamp after trend factor
+                price=max(0.02, min(0.50, price)),  # Re-clamp after trend factor
                 renewable_percentage=self._calculate_renewable_percentage(hour_of_day),
                 region=self.region,
                 confidence=max(0.5, 1.0 - (i / intervals) * 0.3),  # Confidence decreases with time
@@ -246,8 +264,8 @@ class MockGrid:
 
         # Convert to DataFrame
         df = pd.DataFrame([w.model_dump() for w in windows])
-        df['timestamp'] = pd.to_datetime(df['timestamp'])
-        df = df.set_index('timestamp')
+        df["timestamp"] = pd.to_datetime(df["timestamp"])
+        df = df.set_index("timestamp")
 
         return df
 
@@ -275,47 +293,55 @@ class MockGrid:
 
         # Detect carbon peaks
         carbon_threshold = self.profile["base_carbon"] + self.profile["carbon_amplitude"] * 0.7
-        high_carbon_periods = forecast_df[forecast_df['co2_intensity'] > carbon_threshold]
+        high_carbon_periods = forecast_df[forecast_df["co2_intensity"] > carbon_threshold]
         if not high_carbon_periods.empty:
-            events.append({
-                "type": "HIGH_CARBON",
-                "severity": "warning",
-                "start": high_carbon_periods.index[0],
-                "description": f"High-carbon period detected ({high_carbon_periods['co2_intensity'].max():.0f} gCO2/kWh)"
-            })
+            events.append(
+                {
+                    "type": "HIGH_CARBON",
+                    "severity": "warning",
+                    "start": high_carbon_periods.index[0],
+                    "description": f"High-carbon period detected ({high_carbon_periods['co2_intensity'].max():.0f} gCO2/kWh)",
+                }
+            )
 
         # Detect price spikes
         price_threshold = self.profile["base_price"] + self.profile["price_amplitude"] * 0.8
-        high_price_periods = forecast_df[forecast_df['price'] > price_threshold]
+        high_price_periods = forecast_df[forecast_df["price"] > price_threshold]
         if not high_price_periods.empty:
-            events.append({
-                "type": "PRICE_SPIKE",
-                "severity": "warning",
-                "start": high_price_periods.index[0],
-                "description": f"Price spike expected (${high_price_periods['price'].max():.3f}/kWh)"
-            })
+            events.append(
+                {
+                    "type": "PRICE_SPIKE",
+                    "severity": "warning",
+                    "start": high_price_periods.index[0],
+                    "description": f"Price spike expected (${high_price_periods['price'].max():.3f}/kWh)",
+                }
+            )
 
         # Detect green windows (solar peak)
         green_threshold = self.profile["base_carbon"] - self.profile["carbon_amplitude"] * 0.5
-        green_periods = forecast_df[forecast_df['co2_intensity'] < green_threshold]
+        green_periods = forecast_df[forecast_df["co2_intensity"] < green_threshold]
         if not green_periods.empty:
-            events.append({
-                "type": "GREEN_WINDOW",
-                "severity": "opportunity",
-                "start": green_periods.index[0],
-                "description": f"Low-carbon window available ({green_periods['co2_intensity'].min():.0f} gCO2/kWh)"
-            })
+            events.append(
+                {
+                    "type": "GREEN_WINDOW",
+                    "severity": "opportunity",
+                    "start": green_periods.index[0],
+                    "description": f"Low-carbon window available ({green_periods['co2_intensity'].min():.0f} gCO2/kWh)",
+                }
+            )
 
         # Detect cheap windows
         cheap_threshold = self.profile["base_price"] - self.profile["price_amplitude"] * 0.5
-        cheap_periods = forecast_df[forecast_df['price'] < cheap_threshold]
+        cheap_periods = forecast_df[forecast_df["price"] < cheap_threshold]
         if not cheap_periods.empty:
-            events.append({
-                "type": "LOW_PRICE",
-                "severity": "opportunity",
-                "start": cheap_periods.index[0],
-                "description": f"Low-price window available (${cheap_periods['price'].min():.3f}/kWh)"
-            })
+            events.append(
+                {
+                    "type": "LOW_PRICE",
+                    "severity": "opportunity",
+                    "start": cheap_periods.index[0],
+                    "description": f"Low-price window available (${cheap_periods['price'].min():.3f}/kWh)",
+                }
+            )
 
         return events
 
