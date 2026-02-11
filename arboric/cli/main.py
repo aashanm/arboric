@@ -371,6 +371,131 @@ def optimize(
 
 
 @app.command()
+def tradeoff(
+    workload_name: str = typer.Argument(..., help="Name of the workload to analyze"),
+    duration: float | None = typer.Option(
+        None, "--duration", "-d", help="Workload duration in hours"
+    ),
+    deadline: float | None = typer.Option(
+        None, "--deadline", "-D", help="Must complete within hours"
+    ),
+    power: float | None = typer.Option(None, "--power", "-p", help="Power draw in kW"),
+    region: str | None = typer.Option(None, "--region", "-r", help="Grid region"),
+    points: int = typer.Option(10, "--points", "-n", help="Number of tradeoff points to show"),
+    quiet: bool = typer.Option(False, "--quiet", "-q", help="Minimal output"),
+):
+    """
+    Analyze cost/carbon tradeoff frontier for a workload.
+
+    Shows multiple equally-feasible schedules with different cost/carbon tradeoffs,
+    helping you understand the Pareto frontier of scheduling options.
+
+    Example: arboric tradeoff "LLM Training" --duration 6 --deadline 24 --points 10
+
+    If options are not specified, values from ~/.arboric/config.yaml will be used.
+    """
+    cfg = get_config()
+
+    duration = duration if duration is not None else cfg.defaults.duration_hours
+    deadline = deadline if deadline is not None else cfg.defaults.deadline_hours
+    power = power if power is not None else cfg.defaults.power_draw_kw
+    region = region if region is not None else cfg.defaults.region
+    quiet = quiet or cfg.cli.quiet_mode
+
+    if not quiet and cfg.cli.show_banner:
+        print_banner()
+        console.print()
+
+    workload = Workload(
+        name=workload_name,
+        duration_hours=duration,
+        power_draw_kw=power,
+        deadline_hours=deadline,
+        workload_type=WorkloadType.ML_TRAINING,
+    )
+
+    workload_panel = Panel(
+        f"""[bold]Workload:[/bold] {workload.name}
+[bold]Duration:[/bold] {workload.duration_hours}h
+[bold]Power Draw:[/bold] {workload.power_draw_kw} kW
+[bold]Energy:[/bold] {workload.energy_kwh} kWh
+[bold]Deadline:[/bold] {workload.deadline_hours}h from now
+[bold]Region:[/bold] {region}""",
+        title="[bold white]Workload Configuration",
+        border_style=ARBORIC_PURPLE,
+        padding=(1, 2),
+    )
+    console.print(workload_panel)
+    console.print()
+
+    if not quiet:
+        simulate_optimization_animation(workload_name, duration=1.0)
+        console.print()
+
+    grid = MockGrid(region=region)
+    forecast = grid.get_forecast(hours=int(deadline) + int(duration) + 2)
+
+    opt_config = OptimizationConfig(
+        price_weight=cfg.optimization.price_weight,
+        carbon_weight=cfg.optimization.carbon_weight,
+        min_delay_hours=cfg.optimization.min_delay_hours,
+        prefer_continuous=cfg.optimization.prefer_continuous,
+    )
+    autopilot = Autopilot(config=opt_config)
+
+    console.print(f"[bold {ARBORIC_GREEN}]Analyzing tradeoff frontier...")
+    console.print()
+
+    tradeoff_points = autopilot.generate_tradeoff_frontier(workload, forecast, num_points=points)
+
+    tradeoff_table = Table(
+        title="[bold]Cost/Carbon Tradeoff Frontier",
+        box=box.ROUNDED,
+        border_style=ARBORIC_BLUE,
+        header_style=f"bold {ARBORIC_BLUE}",
+    )
+    tradeoff_table.add_column("#", style="dim", width=3)
+    tradeoff_table.add_column("Schedule Time", justify="center", width=16)
+    tradeoff_table.add_column("Cost", justify="right", width=12, style=ARBORIC_AMBER)
+    tradeoff_table.add_column("Carbon (kg)", justify="right", width=14, style=ARBORIC_GREEN)
+    tradeoff_table.add_column("Cost Saved", justify="right", width=12)
+    tradeoff_table.add_column("Carbon Saved", justify="right", width=14)
+
+    for i, point in enumerate(tradeoff_points, 1):
+        cost_color = ARBORIC_GREEN if point["cost_savings"] >= 0 else ARBORIC_AMBER
+        cost_display = f"[{cost_color}]${point['cost']:.2f}[/{cost_color}]"
+        savings_display = (
+            f"[{ARBORIC_GREEN}]${point['cost_savings']:.2f}[/{ARBORIC_GREEN}]"
+            if point["cost_savings"] >= 0
+            else f"[{ARBORIC_AMBER}]-${abs(point['cost_savings']):.2f}[/{ARBORIC_AMBER}]"
+        )
+
+        tradeoff_table.add_row(
+            str(i),
+            point["start_time"].strftime("%H:%M"),
+            cost_display,
+            f"{point['carbon']:.2f}",
+            savings_display,
+            f"{point['carbon_savings']:.2f}",
+        )
+
+    console.print(tradeoff_table)
+    console.print()
+
+    explanation = Panel(
+        "[bold white]Understanding the Tradeoff Frontier[/bold white]\n\n"
+        "[dim]Each row shows a feasible schedule option. Moving down the list:\n"
+        "• Left side: Lower cost options (less delay)\n"
+        "• Right side: Lower carbon options (more delay possible)\n"
+        "• No option dominates another - they're all Pareto-optimal\n"
+        "• Choose based on your priorities (cost vs. sustainability)[/dim]",
+        border_style=ARBORIC_PURPLE,
+        padding=(1, 2),
+    )
+    console.print(explanation)
+
+
+@app.command()
 def demo(
     output: str | None = typer.Option(
         None, "--output", "-o", help="Output file path (or '-' for stdout)"
