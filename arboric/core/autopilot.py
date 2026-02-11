@@ -473,6 +473,125 @@ class Autopilot:
                         f"{result.optimal_start}, but must wait until {min_start}"
                     )
 
+    def generate_tradeoff_frontier(
+        self, workload: Workload, forecast_df: pd.DataFrame, num_points: int = 10
+    ) -> list[dict]:
+        """
+        Generate cost/carbon tradeoff frontier using weight-blending.
+
+        Varies cost/carbon weights from (100% cost, 0% carbon) to (0% cost, 100% carbon),
+        finding the optimal window for each weight combination. Returns distinct points
+        showing different scheduling tradeoff options.
+
+        Args:
+            workload: The workload to analyze
+            forecast_df: Grid forecast DataFrame
+            num_points: Number of tradeoff points to return (default 10)
+
+        Returns:
+            List of dicts with keys: start_time, cost, carbon, cost_savings, carbon_savings
+        """
+        self.clear_log()
+        self._log(f"Generating tradeoff frontier for: {workload.name}")
+
+        if forecast_df.empty:
+            raise ValueError("Forecast data is empty")
+
+        # Ensure datetime index
+        if not isinstance(forecast_df.index, pd.DatetimeIndex):
+            forecast_df.index = pd.to_datetime(forecast_df.index)
+
+        # Get time resolution from forecast
+        if len(forecast_df) > 1:
+            resolution = forecast_df.index[1] - forecast_df.index[0]
+            resolution_hours = resolution.total_seconds() / 3600
+        else:
+            resolution_hours = 1.0
+
+        windows_needed = max(1, int(workload.duration_hours / resolution_hours))
+        baseline_start = forecast_df.index[0]
+        deadline = baseline_start + timedelta(hours=workload.deadline_hours)
+
+        # Calculate baseline
+        baseline_slice = forecast_df.iloc[:windows_needed]
+        _, baseline_cost, baseline_carbon = self._calculate_window_score(baseline_slice, workload)
+
+        # Find max feasible start index
+        max_start_idx = len(forecast_df) - windows_needed
+        for idx in range(len(forecast_df)):
+            potential_end = forecast_df.index[idx] + timedelta(hours=workload.duration_hours)
+            if potential_end > deadline:
+                max_start_idx = min(max_start_idx, idx - 1)
+                break
+
+        # Pre-calculate all windows with their metrics
+        all_windows = []
+        for start_idx in range(max_start_idx + 1):
+            end_idx = start_idx + windows_needed
+            if end_idx > len(forecast_df):
+                break
+
+            window_slice = forecast_df.iloc[start_idx:end_idx]
+            _, cost, carbon = self._calculate_window_score(window_slice, workload)
+
+            all_windows.append(
+                {
+                    "start_idx": start_idx,
+                    "start_time": forecast_df.index[start_idx],
+                    "cost": cost,
+                    "carbon": carbon,
+                    "cost_savings": baseline_cost - cost,
+                    "carbon_savings": baseline_carbon - carbon,
+                    "avg_price": window_slice["price"].mean(),
+                    "avg_carbon": window_slice["co2_intensity"].mean(),
+                }
+            )
+
+        # Normalize costs and carbon for weight-blending
+        if all_windows:
+            min_cost = min(w["cost"] for w in all_windows)
+            max_cost = max(w["cost"] for w in all_windows)
+            min_carbon = min(w["carbon"] for w in all_windows)
+            max_carbon = max(w["carbon"] for w in all_windows)
+
+            cost_range = max_cost - min_cost if max_cost > min_cost else 1.0
+            carbon_range = max_carbon - min_carbon if max_carbon > min_carbon else 1.0
+
+            # Generate tradeoff points by varying weights
+            selected_points = {}  # Use dict to track unique windows by start_idx
+
+            for i in range(num_points):
+                # Weight varies from 100% cost to 0% cost (and opposite for carbon)
+                alpha = i / (num_points - 1) if num_points > 1 else 0.5
+                cost_weight = 1.0 - alpha
+                carbon_weight = alpha
+
+                # Find window with best score for this weight combination
+                best_window = None
+                best_score = float("inf")
+
+                for window in all_windows:
+                    # Normalize metrics to 0-1 range
+                    norm_cost = (window["cost"] - min_cost) / cost_range
+                    norm_carbon = (window["carbon"] - min_carbon) / carbon_range
+
+                    # Weighted score (lower is better)
+                    score = (norm_cost * cost_weight) + (norm_carbon * carbon_weight)
+
+                    if score < best_score:
+                        best_score = score
+                        best_window = window
+
+                if best_window:
+                    # Store by start_idx to avoid duplicates
+                    selected_points[best_window["start_idx"]] = best_window
+
+            # Convert dict to sorted list and return
+            result = sorted(selected_points.values(), key=lambda x: x["cost"])
+            return result
+
+        return []
+
 
 def create_autopilot(
     price_weight: float = DEFAULT_PRICE_WEIGHT,
