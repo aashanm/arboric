@@ -1,0 +1,1026 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Arboric — Schedule AI Workloads Smarter</title>
+  <meta name="description" content="Arboric automatically shifts AI workloads to cheaper, cleaner energy windows. Cut compute costs 30-60% with zero code changes." />
+  <meta name="keywords" content="carbon-aware compute scheduling, AI workload optimization, SB 253 cloud compliance, green cloud computing, AI cost reduction" />
+  <link rel="canonical" href="https://aashanm.github.io/arboric" />
+  <meta property="og:title" content="Arboric — Schedule AI Workloads Smarter" />
+  <meta property="og:description" content="Cut AI compute costs 30-60% by shifting workloads to cheaper, cleaner energy windows. SB 253 compliant. Any cloud." />
+  <meta property="og:url" content="https://aashanm.github.io/arboric" />
+  <meta property="og:type" content="website" />
+  <meta property="og:image" content="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='1200' height='630' viewBox='0 0 1200 630'%3E%3Crect fill='%230a0a0a' width='1200' height='630'/%3E%3Crect fill='%23111111' x='50' y='40' width='1100' height='500' rx='12'/%3E%3Ctext x='600' y='80' font-family='Inter, sans-serif' font-size='32' font-weight='700' fill='%23e5e5e5' text-anchor='middle'%3EDuck Curve Optimization%3C/text%3E%3Ctext x='600' y='110' font-family='Inter, sans-serif' font-size='16' fill='%23a3a3a3' text-anchor='middle'%3E24-hour grid forecast with carbon-aware scheduling%3C/text%3E%3Cg stroke='%23262626' stroke-width='1'%3E%3Cline x1='100' y1='300' x2='1100' y2='300'/%3E%3Cline x1='100' y1='200' x2='1100' y2='200'/%3E%3Cline x1='100' y1='400' x2='1100' y2='400'/%3E%3C/g%3E%3Cg stroke='%2322c55e' stroke-width='2' fill='none'%3E%3Cpath d='M 100 350 Q 250 280 400 320 T 700 240 T 1100 180'/%3E%3C/g%3E%3Crect fill='%2322c55e' x='1050' y='170' width='12' height='12' rx='2'/%3E%3Ctext x='1070' y='180' font-family='monospace' font-size='12' fill='%2322c55e'%3EOptimal Window%3C/text%3E%3Crect fill='%23ef4444' x='450' y='390' width='12' height='12' rx='2'/%3E%3Ctext x='470' y='400' font-family='monospace' font-size='12' fill='%23ef4444'%3EAvoid Peak%3C/text%3E%3Ctext x='600' y='500' font-family='Inter, sans-serif' font-size='16' font-weight='600' fill='%23e5e5e5' text-anchor='middle'%3ESave 30-60% on compute costs • Prove Scope 3 compliance • Deploy in hours%3C/text%3E%3C/svg%3E" />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="630" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="Arboric — Schedule AI Workloads Smarter" />
+  <meta name="twitter:description" content="Cut AI compute costs 30-60% by shifting workloads to cheaper, cleaner energy windows." />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            bg: '#0a0a0a',
+            surface: '#111111',
+            'surface-2': '#1a1a1a',
+            border: '#262626',
+            green: { 500: '#22c55e', 400: '#4ade80', 600: '#16a34a' },
+            blue: { 500: '#3b82f6', 400: '#60a5fa' },
+            amber: { 500: '#f59e0b', 400: '#fbbf24' },
+            red: { 500: '#ef4444', 400: '#f87171' },
+            purple: { 500: '#8b5cf6', 400: '#a78bfa' },
+          },
+          fontFamily: {
+            mono: ['ui-monospace', 'SFMono-Regular', 'Menlo', 'Monaco', 'Consolas', 'monospace'],
+            sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif'],
+          },
+        },
+      },
+    };
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <style>
+    body { background: #0a0a0a; color: #e5e5e5; }
+    @keyframes draw { from { stroke-dashoffset: 2000; } to { stroke-dashoffset: 0; } }
+    @keyframes fadeUp { from { opacity: 0; transform: translateY(24px); } to { opacity: 1; transform: translateY(0); } }
+    @keyframes pulse-green { 0%, 100% { opacity: 0.15; } 50% { opacity: 0.3; } }
+    @keyframes slideRight { from { width: 0; } to { width: 100%; } }
+    @keyframes countUp { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+    .anim-draw { stroke-dasharray: 2000; stroke-dashoffset: 2000; animation: draw 2.5s ease-out forwards; }
+    .anim-draw-delay { animation-delay: 0.3s; }
+    .anim-fade-up { animation: fadeUp 0.7s ease-out both; }
+    .anim-delay-1 { animation-delay: 0.15s; }
+    .anim-delay-2 { animation-delay: 0.3s; }
+    .anim-delay-3 { animation-delay: 0.45s; }
+    .anim-delay-4 { animation-delay: 0.6s; }
+    .pulse-band { animation: pulse-green 3s ease-in-out infinite; }
+    .flow-step { animation: countUp 0.5s ease-out both; }
+    input[type=range] { -webkit-appearance: none; background: transparent; }
+    input[type=range]::-webkit-slider-track { height: 4px; background: #262626; border-radius: 2px; }
+    input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 18px; height: 18px; border-radius: 50%; background: #22c55e; margin-top: -7px; cursor: pointer; }
+    input[type=range]::-moz-range-track { height: 4px; background: #262626; border-radius: 2px; border: none; }
+    input[type=range]::-moz-range-thumb { width: 18px; height: 18px; border-radius: 50%; background: #22c55e; border: none; cursor: pointer; }
+    select { -webkit-appearance: none; -moz-appearance: none; }
+  </style>
+</head>
+<body class="font-sans antialiased">
+  <div id="root"></div>
+
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+  <script type="text/babel" data-type="module">
+    const { useState, useEffect, useCallback, useRef, useMemo, memo } = React;
+
+    /* ================================================================
+       CONSTANTS — sourced from grid_oracle.py & autopilot.py
+       ================================================================ */
+    const BRAND = {
+      green: '#22c55e', blue: '#3b82f6', amber: '#f59e0b',
+      red: '#ef4444', purple: '#8b5cf6',
+    };
+
+    const REGION_PROFILES = {
+      'US-WEST':  { base_carbon: 350, carbon_amplitude: 200, base_price: 0.12, price_amplitude: 0.08, solar_peak_hour: 13, price_peak_hour: 18 },
+      'US-EAST':  { base_carbon: 420, carbon_amplitude: 150, base_price: 0.14, price_amplitude: 0.07, solar_peak_hour: 13, price_peak_hour: 17 },
+      'EU-WEST':  { base_carbon: 280, carbon_amplitude: 180, base_price: 0.18, price_amplitude: 0.10, solar_peak_hour: 14, price_peak_hour: 19 },
+      'NORDIC':   { base_carbon: 80,  carbon_amplitude: 40,  base_price: 0.08, price_amplitude: 0.04, solar_peak_hour: 13, price_peak_hour: 18 },
+    };
+
+    // Normalization ceilings from autopilot.py _calculate_window_score
+    const PRICE_CEILING = 0.30;
+    const CARBON_CEILING = 600;
+    const DEFAULT_PRICE_WEIGHT = 0.7;
+    const DEFAULT_CARBON_WEIGHT = 0.3;
+
+    // Performance fee from pitch doc
+    const PERFORMANCE_FEE = 0.20;
+
+    // SB 253 deadline
+    const SB253_DEADLINE = new Date('2027-01-01T00:00:00');
+
+    /* ================================================================
+       SEEDED PRNG — deterministic output per CLAUDE.md
+       ================================================================ */
+    function mulberry32(seed) {
+      let a = seed | 0;
+      return function() {
+        a = (a + 0x6D2B79F5) | 0;
+        let t = Math.imul(a ^ (a >>> 15), a | 1);
+        t ^= (t + Math.imul(t ^ (t >>> 7), t | 61));
+        return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+      };
+    }
+
+    function seededGauss(rng, mean, stddev) {
+      const u1 = rng();
+      const u2 = rng();
+      const z = Math.sqrt(-2 * Math.log(u1 || 1e-10)) * Math.cos(2 * Math.PI * u2);
+      return mean + z * stddev;
+    }
+
+    /* ================================================================
+       GRID ORACLE — ported from grid_oracle.py
+       ================================================================ */
+    function createMockGrid(region, seed = 42) {
+      const profile = REGION_PROFILES[region];
+      if (!profile) throw new Error(`Unknown region: ${region}`);
+
+      const rng = mulberry32(seed);
+      const dailyCarbonShift = rng() * 60 - 30;       // uniform(-30, 30)
+      const dailyPriceShift  = rng() * 0.04 - 0.02;   // uniform(-0.02, 0.02)
+      const weatherFactor    = rng() * 0.4 + 0.8;      // uniform(0.8, 1.2)
+
+      function calcSolarFactor(hour) {
+        const solarPeak = 13.0;
+        const solarWidth = 2.5;
+        let sf = Math.exp(-Math.pow(hour - solarPeak, 2) / (2 * solarWidth * solarWidth));
+        sf *= weatherFactor;
+        if (hour < 6 || hour > 20) sf = 0;
+        return Math.min(1, Math.max(0, sf));
+      }
+
+      function calcCarbon(hour) {
+        const sf = calcSolarFactor(hour);
+        const solarReduction = profile.carbon_amplitude * 1.2 * sf;
+        let evening = 0;
+        if (hour >= 16 && hour <= 22) {
+          const d = Math.abs(hour - 19);
+          evening = 120 * Math.exp(-d * d / (2 * 2.5 * 2.5));
+        }
+        let night = 0;
+        if (hour < 6 || hour > 21) night = 80;
+        const noise = seededGauss(rng, 0, 10);
+        const val = profile.base_carbon - solarReduction + evening + night + dailyCarbonShift + noise;
+        return Math.max(50, Math.min(800, val));
+      }
+
+      function calcPrice(hour) {
+        const sf = calcSolarFactor(hour);
+        const solarDrop = profile.price_amplitude * 1.5 * sf;
+        let evening = 0;
+        if (hour >= 15 && hour <= 22) {
+          const d = Math.abs(hour - 18.5);
+          evening = profile.price_amplitude * 1.2 * Math.exp(-d * d / (2 * 2 * 2));
+        }
+        let night = 0;
+        if (hour < 6 || hour > 22) night = profile.price_amplitude * 0.3;
+        const noise = seededGauss(rng, 0, 0.005);
+        const val = profile.base_price - solarDrop + evening + night + dailyPriceShift + noise;
+        return Math.max(0.02, Math.min(0.50, val));
+      }
+
+      function calcRenewable(hour) {
+        const solar = 40 * weatherFactor * Math.max(0, Math.cos(2 * Math.PI * (hour - profile.solar_peak_hour) / 24));
+        const windBase = 15 + (rng() * 10 - 5);
+        const wind = windBase + 10 * Math.cos(2 * Math.PI * (hour - 4) / 24);
+        const baseR = region === 'NORDIC' ? 60 : 10;
+        const total = baseR + solar + Math.max(0, wind);
+        return Math.min(95, Math.max(5, total + seededGauss(rng, 0, 3)));
+      }
+
+      function getForecast(hours, startHour = 18) {
+        const data = [];
+        for (let i = 0; i < hours; i++) {
+          const h = (startHour + i) % 24;
+          const trendFactor = 1 + (i / hours) * (rng() * 0.1 - 0.05);
+          let co2 = calcCarbon(h) * trendFactor;
+          let price = calcPrice(h) * trendFactor;
+          co2 = Math.max(50, Math.min(800, co2));
+          price = Math.max(0.02, Math.min(0.50, price));
+          data.push({
+            hour: i,
+            hourOfDay: h,
+            co2_intensity: co2,
+            price: price,
+            renewable_pct: calcRenewable(h),
+            label: `${String(h).padStart(2, '0')}:00`,
+          });
+        }
+        return data;
+      }
+
+      return { getForecast, profile };
+    }
+
+    /* ================================================================
+       AUTOPILOT — ported from autopilot.py
+       ================================================================ */
+    function optimizeSchedule(forecast, durationHours, powerDrawKw, deadlineHours) {
+      const energyKwh = powerDrawKw * durationHours;
+      const windowsNeeded = Math.max(1, Math.round(durationHours));
+
+      // Baseline (immediate start)
+      const baselineSlice = forecast.slice(0, windowsNeeded);
+      const baselineAvgPrice = baselineSlice.reduce((s, w) => s + w.price, 0) / baselineSlice.length;
+      const baselineAvgCarbon = baselineSlice.reduce((s, w) => s + w.co2_intensity, 0) / baselineSlice.length;
+      const baselineCost = baselineAvgPrice * energyKwh;
+      const baselineCarbonKg = (baselineAvgCarbon * energyKwh) / 1000;
+
+      function scoreWindow(slice) {
+        const avgP = slice.reduce((s, w) => s + w.price, 0) / slice.length;
+        const avgC = slice.reduce((s, w) => s + w.co2_intensity, 0) / slice.length;
+        const pNorm = Math.min(avgP / PRICE_CEILING, 1.0) * 100;
+        const cNorm = Math.min(avgC / CARBON_CEILING, 1.0) * 100;
+        return {
+          score: pNorm * DEFAULT_PRICE_WEIGHT + cNorm * DEFAULT_CARBON_WEIGHT,
+          avgPrice: avgP,
+          avgCarbon: avgC,
+          cost: avgP * energyKwh,
+          carbonKg: (avgC * energyKwh) / 1000,
+        };
+      }
+
+      // Scan all feasible start times
+      let bestScore = Infinity;
+      let bestIdx = 0;
+      let bestMetrics = scoreWindow(baselineSlice);
+
+      const maxStartIdx = Math.min(
+        forecast.length - windowsNeeded,
+        Math.round(deadlineHours - durationHours)
+      );
+
+      for (let i = 0; i <= maxStartIdx; i++) {
+        const slice = forecast.slice(i, i + windowsNeeded);
+        if (slice.length < windowsNeeded) break;
+        const m = scoreWindow(slice);
+        if (m.score < bestScore) {
+          bestScore = m.score;
+          bestIdx = i;
+          bestMetrics = m;
+        }
+      }
+
+      return {
+        baselineCost,
+        baselineCarbonKg,
+        baselineAvgPrice,
+        baselineAvgCarbon,
+        optimizedCost: bestMetrics.cost,
+        optimizedCarbonKg: bestMetrics.carbonKg,
+        optimizedAvgPrice: bestMetrics.avgPrice,
+        optimizedAvgCarbon: bestMetrics.avgCarbon,
+        costSavings: baselineCost - bestMetrics.cost,
+        carbonSavingsKg: baselineCarbonKg - bestMetrics.carbonKg,
+        costSavingsPercent: baselineCost > 0 ? ((baselineCost - bestMetrics.cost) / baselineCost) * 100 : 0,
+        carbonSavingsPercent: baselineCarbonKg > 0 ? ((baselineCarbonKg - bestMetrics.carbonKg) / baselineCarbonKg) * 100 : 0,
+        delayHours: bestIdx,
+        optimalStartIdx: bestIdx,
+        windowsNeeded,
+        energyKwh,
+      };
+    }
+
+    /* ================================================================
+       HOOKS
+       ================================================================ */
+    function useDebounce(value, delay = 150) {
+      const [debounced, setDebounced] = useState(value);
+      useEffect(() => {
+        const t = setTimeout(() => setDebounced(value), delay);
+        return () => clearTimeout(t);
+      }, [value, delay]);
+      return debounced;
+    }
+
+    function useCountdown(target) {
+      const [now, setNow] = useState(Date.now());
+      useEffect(() => {
+        const id = setInterval(() => setNow(Date.now()), 1000);
+        return () => clearInterval(id);
+      }, []);
+      const diff = Math.max(0, target.getTime() - now);
+      const days = Math.floor(diff / 86400000);
+      const hours = Math.floor((diff % 86400000) / 3600000);
+      const minutes = Math.floor((diff % 3600000) / 60000);
+      const seconds = Math.floor((diff % 60000) / 1000);
+      return { days, hours, minutes, seconds };
+    }
+
+    function useInView(ref, opts = { threshold: 0.15 }) {
+      const [visible, setVisible] = useState(false);
+      useEffect(() => {
+        if (!ref.current) return;
+        const obs = new IntersectionObserver(([e]) => { if (e.isIntersecting) setVisible(true); }, opts);
+        obs.observe(ref.current);
+        return () => obs.disconnect();
+      }, []);
+      return visible;
+    }
+
+    /* ================================================================
+       COMPONENTS
+       ================================================================ */
+
+    /* ---- Nav ---- */
+    const Nav = memo(function Nav() {
+      const [scrolled, setScrolled] = useState(false);
+      useEffect(() => {
+        const h = () => setScrolled(window.scrollY > 20);
+        window.addEventListener('scroll', h, { passive: true });
+        return () => window.removeEventListener('scroll', h);
+      }, []);
+      return (
+        <nav className={`fixed top-0 w-full z-50 transition-all duration-300 ${scrolled ? 'bg-bg/90 backdrop-blur-md border-b border-border' : 'bg-transparent'}`}>
+          <div className="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
+            <a href="#" className="flex items-center gap-2 text-white font-bold text-lg">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <path d="M12 2L4 7v10l8 5 8-5V7l-8-5z" stroke="#22c55e" strokeWidth="2" fill="none"/>
+                <path d="M12 8v8M8 12h8" stroke="#22c55e" strokeWidth="2" strokeLinecap="round"/>
+              </svg>
+              Arboric
+            </a>
+            <div className="hidden md:flex items-center gap-8 text-sm text-neutral-400">
+              <a href="#how" className="hover:text-white transition-colors">How It Works</a>
+              <a href="#calculator" className="hover:text-white transition-colors">Calculator</a>
+              <a href="#pricing" className="hover:text-white transition-colors">Pricing</a>
+              <a href="https://github.com/aashanm/arboric" target="_blank" rel="noopener noreferrer"
+                className="px-4 py-1.5 rounded-md border border-border text-white hover:border-green-500 transition-colors">
+                GitHub
+              </a>
+            </div>
+          </div>
+        </nav>
+      );
+    });
+
+    /* ---- Hero Chart (SVG) ---- */
+    const HeroChart = memo(function HeroChart() {
+      const grid = createMockGrid('US-WEST', 42);
+      const data = grid.getForecast(24, 18);
+
+      const W = 600, H = 200, PAD = { t: 20, r: 50, b: 30, l: 50 };
+      const chartW = W - PAD.l - PAD.r;
+      const chartH = H - PAD.t - PAD.b;
+
+      const priceMin = Math.min(...data.map(d => d.price));
+      const priceMax = Math.max(...data.map(d => d.price));
+      const carbonMin = Math.min(...data.map(d => d.co2_intensity));
+      const carbonMax = Math.max(...data.map(d => d.co2_intensity));
+
+      const x = (i) => PAD.l + (i / (data.length - 1)) * chartW;
+      const yPrice = (v) => PAD.t + chartH - ((v - priceMin) / (priceMax - priceMin || 1)) * chartH;
+      const yCarbon = (v) => PAD.t + chartH - ((v - carbonMin) / (carbonMax - carbonMin || 1)) * chartH;
+
+      const pricePath = data.map((d, i) => `${i === 0 ? 'M' : 'L'}${x(i).toFixed(1)},${yPrice(d.price).toFixed(1)}`).join(' ');
+      const carbonPath = data.map((d, i) => `${i === 0 ? 'M' : 'L'}${x(i).toFixed(1)},${yCarbon(d.co2_intensity).toFixed(1)}`).join(' ');
+
+      // Find optimal window (lowest composite scores around solar peak)
+      const result = optimizeSchedule(data, 8, 120, 24);
+      const optStart = result.optimalStartIdx;
+      const optEnd = optStart + result.windowsNeeded;
+
+      return (
+        <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-auto" role="img" aria-label="24-hour grid forecast showing price and carbon intensity with optimal scheduling window highlighted">
+          <defs>
+            <linearGradient id="greenGlow" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="#22c55e" stopOpacity="0.25"/>
+              <stop offset="100%" stopColor="#22c55e" stopOpacity="0.02"/>
+            </linearGradient>
+          </defs>
+
+          {/* Optimal window band */}
+          <rect x={x(optStart)} y={PAD.t} width={x(Math.min(optEnd, data.length - 1)) - x(optStart)}
+            height={chartH} fill="url(#greenGlow)" className="pulse-band" rx="4"/>
+
+          {/* Grid lines */}
+          {[0, 0.25, 0.5, 0.75, 1].map(f => (
+            <line key={f} x1={PAD.l} x2={W - PAD.r}
+              y1={PAD.t + chartH * (1 - f)} y2={PAD.t + chartH * (1 - f)}
+              stroke="#262626" strokeWidth="0.5"/>
+          ))}
+
+          {/* Price line (amber) */}
+          <path d={pricePath} fill="none" stroke={BRAND.amber} strokeWidth="2" className="anim-draw" opacity="0.9"/>
+
+          {/* Carbon line (red) */}
+          <path d={carbonPath} fill="none" stroke={BRAND.red} strokeWidth="2" className="anim-draw anim-draw-delay" opacity="0.7"/>
+
+          {/* Optimal window label */}
+          <text x={(x(optStart) + x(Math.min(optEnd, data.length - 1))) / 2} y={PAD.t + 14}
+            textAnchor="middle" fill="#22c55e" fontSize="9" fontWeight="600" fontFamily="monospace">
+            OPTIMAL WINDOW
+          </text>
+
+          {/* X-axis labels */}
+          {data.filter((_, i) => i % 4 === 0).map((d, i) => (
+            <text key={i} x={x(d.hour)} y={H - 5} textAnchor="middle"
+              fill="#737373" fontSize="9" fontFamily="monospace">{d.label}</text>
+          ))}
+
+          {/* Y-axis labels */}
+          <text x={PAD.l - 8} y={PAD.t + 4} textAnchor="end" fill={BRAND.amber} fontSize="8" fontFamily="monospace">
+            ${priceMax.toFixed(2)}
+          </text>
+          <text x={PAD.l - 8} y={PAD.t + chartH} textAnchor="end" fill={BRAND.amber} fontSize="8" fontFamily="monospace">
+            ${priceMin.toFixed(2)}
+          </text>
+          <text x={W - PAD.r + 8} y={PAD.t + 4} textAnchor="start" fill={BRAND.red} fontSize="8" fontFamily="monospace">
+            {carbonMax.toFixed(0)}g
+          </text>
+          <text x={W - PAD.r + 8} y={PAD.t + chartH} textAnchor="start" fill={BRAND.red} fontSize="8" fontFamily="monospace">
+            {carbonMin.toFixed(0)}g
+          </text>
+
+          {/* Legend */}
+          <line x1={PAD.l} y1={H - 2} x2={PAD.l + 20} y2={H - 2} stroke={BRAND.amber} strokeWidth="2"/>
+          <text x={PAD.l + 24} y={H} fill="#a3a3a3" fontSize="8" fontFamily="monospace">$/kWh</text>
+          <line x1={PAD.l + 70} y1={H - 2} x2={PAD.l + 90} y2={H - 2} stroke={BRAND.red} strokeWidth="2"/>
+          <text x={PAD.l + 94} y={H} fill="#a3a3a3" fontSize="8" fontFamily="monospace">gCO2/kWh</text>
+        </svg>
+      );
+    });
+
+    /* ---- Hero Section ---- */
+    function Hero() {
+      return (
+        <section className="relative min-h-screen flex items-center pt-16">
+          <div className="absolute inset-0 bg-gradient-to-b from-green-500/5 via-transparent to-transparent pointer-events-none"/>
+          <div className="max-w-6xl mx-auto px-6 py-20 grid lg:grid-cols-2 gap-12 items-center">
+            <div className="anim-fade-up">
+              <h1 className="text-4xl md:text-5xl lg:text-[3.4rem] font-extrabold leading-[1.1] text-white tracking-tight">
+                You're burning $400K/year on AI compute you could schedule smarter.
+              </h1>
+              <p className="mt-6 text-lg text-neutral-400 leading-relaxed max-w-xl">
+                Arboric shifts your AI workloads to cheaper, cleaner energy windows — automatically.
+                Zero code changes. Zero vendor lock-in.
+              </p>
+              <div className="mt-8 flex flex-wrap gap-4">
+                <a href="#calculator"
+                  className="px-6 py-3 bg-green-500 hover:bg-green-600 text-black font-semibold rounded-lg transition-colors"
+                  aria-label="Scroll to savings calculator">
+                  See What You'd Save
+                </a>
+                <a href="https://github.com/aashanm/arboric" target="_blank" rel="noopener noreferrer"
+                  className="px-6 py-3 border border-border hover:border-neutral-500 text-white font-medium rounded-lg transition-colors flex items-center gap-2">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
+                  View on GitHub
+                </a>
+              </div>
+            </div>
+            <div className="anim-fade-up anim-delay-2 bg-surface rounded-xl border border-border p-4">
+              <div className="flex items-center gap-2 mb-3 text-xs text-neutral-500 font-mono">
+                <span className="w-2 h-2 rounded-full bg-green-500 inline-block"/>
+                LIVE GRID FORECAST &mdash; US-WEST &mdash; 24H
+              </div>
+              <HeroChart />
+            </div>
+          </div>
+        </section>
+      );
+    }
+
+    /* ---- Urgency Bar ---- */
+    const UrgencyBar = memo(function UrgencyBar() {
+      const cd = useCountdown(SB253_DEADLINE);
+      return (
+        <section className="bg-amber-500/10 border-y border-amber-500/20">
+          <div className="max-w-6xl mx-auto px-6 py-4 flex flex-col md:flex-row items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <span className="text-amber-400 text-sm font-semibold uppercase tracking-wide">SB 253</span>
+              <span className="text-neutral-300 text-sm">
+                Scope 3 reporting is mandatory <span className="text-white font-semibold">January 1, 2027</span>
+              </span>
+            </div>
+            <div className="flex items-center gap-4 font-mono text-sm">
+              <div className="text-center"><span className="text-white font-bold text-lg">{cd.days}</span><span className="text-neutral-500 ml-1">d</span></div>
+              <span className="text-neutral-600">:</span>
+              <div className="text-center"><span className="text-white font-bold text-lg">{String(cd.hours).padStart(2,'0')}</span><span className="text-neutral-500 ml-1">h</span></div>
+              <span className="text-neutral-600">:</span>
+              <div className="text-center"><span className="text-white font-bold text-lg">{String(cd.minutes).padStart(2,'0')}</span><span className="text-neutral-500 ml-1">m</span></div>
+              <span className="text-neutral-600">:</span>
+              <div className="text-center"><span className="text-white font-bold text-lg">{String(cd.seconds).padStart(2,'0')}</span><span className="text-neutral-500 ml-1">s</span></div>
+            </div>
+            <a href="#calculator"
+              className="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-black font-semibold text-sm rounded transition-colors whitespace-nowrap"
+              aria-label="Get started with compliance calculator">
+              Start Now
+            </a>
+          </div>
+        </section>
+      );
+    });
+
+    /* ---- How It Works ---- */
+    function HowItWorks() {
+      const ref = useRef(null);
+      const vis = useInView(ref);
+      const steps = [
+        { num: '01', title: 'Define', desc: 'Tell Arboric your workload: duration, power draw, deadline.', icon: '{ }',
+          code: '{\n  "name": "LLM Training",\n  "duration_hours": 8,\n  "power_draw_kw": 120\n}' },
+        { num: '02', title: 'Scan', desc: 'We forecast grid prices and carbon intensity across every region, every hour.', icon: '~',
+          code: '13:00  $0.06/kWh  142 gCO2\n14:00  $0.07/kWh  158 gCO2\n18:00  $0.19/kWh  487 gCO2' },
+        { num: '03', title: 'Shift', desc: 'Your job runs at the cheapest, cleanest window \u2014 automatically.', icon: '\u2713',
+          code: 'Delay: +4h\nCost:  -$45.57 (-41.5%)\nCO2:   -193.68 kg (-59.0%)' },
+      ];
+      return (
+        <section id="how" className="py-24 bg-surface" ref={ref}>
+          <div className="max-w-6xl mx-auto px-6">
+            <div className="max-w-2xl mx-auto text-center mb-16">
+              <h2 className="text-3xl md:text-4xl font-bold text-white">
+                Three lines of config. Zero lines of code changed.
+              </h2>
+              <p className="text-neutral-400 mt-4">
+                Deploy in hours, not months. Prove your Scope 3 emissions before <span className="text-amber-400 font-semibold">January 2027</span>.
+              </p>
+            </div>
+            <div className="mt-16 grid md:grid-cols-3 gap-8">
+              {steps.map((s, i) => (
+                <div key={s.num} className={`${vis ? 'anim-fade-up' : 'opacity-0'} ${i === 1 ? 'anim-delay-2' : i === 2 ? 'anim-delay-3' : ''}`}>
+                  <div className="flex items-center gap-3 mb-4">
+                    <span className="w-10 h-10 rounded-full border-2 border-green-500 flex items-center justify-center text-green-400 text-sm font-bold font-mono">
+                      {s.num}
+                    </span>
+                    <h3 className="text-xl font-bold text-white">{s.title}</h3>
+                  </div>
+                  <p className="text-neutral-400 mb-4">{s.desc}</p>
+                  <pre className="bg-bg rounded-lg border border-border p-4 text-xs text-green-400 font-mono overflow-x-auto leading-relaxed">
+                    {s.code}
+                  </pre>
+                </div>
+              ))}
+            </div>
+            <div className="mt-12 text-center">
+              <a href="#calculator"
+                className="px-6 py-3 bg-green-500 hover:bg-green-600 text-black font-semibold rounded-lg transition-colors inline-block"
+                aria-label="Scroll to savings calculator">
+                Calculate Your Savings
+              </a>
+            </div>
+          </div>
+        </section>
+      );
+    }
+
+    /* ---- Savings Calculator ---- */
+    const Calculator = memo(function Calculator() {
+      const [duration, setDuration] = useState(8);
+      const [power, setPower] = useState(120);
+      const [deadline, setDeadline] = useState(24);
+      const [region, setRegion] = useState('US-WEST');
+
+      const dDuration = useDebounce(duration, 150);
+      const dPower = useDebounce(power, 150);
+      const dDeadline = useDebounce(deadline, 150);
+
+      const result = useMemo(() => {
+        const safeDeadline = Math.max(dDeadline, dDuration + 1);
+        const grid = createMockGrid(region, 42);
+        const forecast = grid.getForecast(safeDeadline + dDuration + 4, 18);
+        return optimizeSchedule(forecast, dDuration, dPower, safeDeadline);
+      }, [dDuration, dPower, dDeadline, region]);
+
+      const annualSavings = result.costSavings * 0.80 * 365;
+      const youPay = result.costSavings * PERFORMANCE_FEE;
+
+      return (
+        <section id="calculator" className="py-24">
+          <div className="max-w-5xl mx-auto px-6">
+            <h2 className="text-3xl md:text-4xl font-bold text-white text-center">Run your numbers.</h2>
+            <p className="text-neutral-400 text-center mt-3 max-w-2xl mx-auto">
+              Adjust the sliders to match your workload. Savings computed using the same algorithm as our CLI.
+            </p>
+
+            {/* Inputs */}
+            <div className="mt-12 grid sm:grid-cols-2 lg:grid-cols-4 gap-6">
+              <div>
+                <label className="block text-sm text-neutral-400 mb-2" htmlFor="calc-duration">
+                  Duration <span className="text-white font-mono font-bold">{duration}h</span>
+                </label>
+                <input id="calc-duration" type="range" min="1" max="24" step="1" value={duration}
+                  onChange={e => setDuration(+e.target.value)}
+                  aria-label={`Workload duration: ${duration} hours`}
+                  className="w-full"/>
+              </div>
+              <div>
+                <label className="block text-sm text-neutral-400 mb-2" htmlFor="calc-power">
+                  Power Draw <span className="text-white font-mono font-bold">{power} kW</span>
+                </label>
+                <input id="calc-power" type="range" min="10" max="500" step="10" value={power}
+                  onChange={e => setPower(+e.target.value)}
+                  aria-label={`Power draw: ${power} kilowatts`}
+                  className="w-full"/>
+              </div>
+              <div>
+                <label className="block text-sm text-neutral-400 mb-2" htmlFor="calc-deadline">
+                  Deadline <span className="text-white font-mono font-bold">{deadline}h</span>
+                </label>
+                <input id="calc-deadline" type="range" min={duration + 1} max="48" step="1" value={Math.max(deadline, duration + 1)}
+                  onChange={e => setDeadline(+e.target.value)}
+                  aria-label={`Deadline: ${deadline} hours`}
+                  className="w-full"/>
+              </div>
+              <div>
+                <label className="block text-sm text-neutral-400 mb-2" htmlFor="calc-region">Region</label>
+                <select id="calc-region" value={region} onChange={e => setRegion(e.target.value)}
+                  aria-label="Grid region"
+                  className="w-full bg-surface border border-border rounded-lg px-4 py-2.5 text-white font-mono text-sm">
+                  {Object.keys(REGION_PROFILES).map(r => <option key={r} value={r}>{r}</option>)}
+                </select>
+              </div>
+            </div>
+
+            {/* Results Comparison */}
+            <div className="mt-10 grid md:grid-cols-2 gap-6">
+              {/* Without Arboric */}
+              <div className="bg-surface rounded-xl border border-red-500/20 p-6">
+                <h3 className="text-sm font-semibold text-red-400 uppercase tracking-wide mb-4">Without Arboric</h3>
+                <div className="space-y-3">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-neutral-400">Avg Price</span>
+                    <span className="text-white font-mono">${result.baselineAvgPrice.toFixed(4)}/kWh</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-neutral-400">Total Cost</span>
+                    <span className="text-white font-mono text-lg font-bold">${result.baselineCost.toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-neutral-400">Avg Carbon</span>
+                    <span className="text-white font-mono">{result.baselineAvgCarbon.toFixed(0)} gCO2/kWh</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-neutral-400">Total Carbon</span>
+                    <span className="text-white font-mono">{result.baselineCarbonKg.toFixed(2)} kg</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* With Arboric */}
+              <div className="bg-surface rounded-xl border border-green-500/30 p-6">
+                <h3 className="text-sm font-semibold text-green-400 uppercase tracking-wide mb-4">With Arboric</h3>
+                <div className="space-y-3">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-neutral-400">Avg Price</span>
+                    <span className="text-green-400 font-mono">${result.optimizedAvgPrice.toFixed(4)}/kWh</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-neutral-400">Total Cost</span>
+                    <span className="text-green-400 font-mono text-lg font-bold">${result.optimizedCost.toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-neutral-400">Avg Carbon</span>
+                    <span className="text-green-400 font-mono">{result.optimizedAvgCarbon.toFixed(0)} gCO2/kWh</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-neutral-400">Total Carbon</span>
+                    <span className="text-green-400 font-mono">{result.optimizedCarbonKg.toFixed(2)} kg</span>
+                  </div>
+                  <div className="pt-2 mt-2 border-t border-border flex justify-between text-sm">
+                    <span className="text-neutral-400">Delay</span>
+                    <span className="text-blue-400 font-mono">+{result.delayHours}h</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Savings Summary */}
+            <div className="mt-8 bg-surface-2 rounded-xl border border-green-500/20 p-6 text-center">
+              <div className="flex flex-col md:flex-row items-center justify-center gap-8 mb-6">
+                <div>
+                  <span className="text-3xl md:text-4xl font-extrabold text-green-400 font-mono">
+                    ${result.costSavings.toFixed(2)}
+                  </span>
+                  <span className="block text-sm text-neutral-400 mt-1">saved per run ({result.costSavingsPercent.toFixed(1)}%)</span>
+                </div>
+                <div className="hidden md:block w-px h-12 bg-border"/>
+                <div>
+                  <span className="text-3xl md:text-4xl font-extrabold text-green-400 font-mono">
+                    {result.carbonSavingsKg.toFixed(1)} kg
+                  </span>
+                  <span className="block text-sm text-neutral-400 mt-1">CO2 avoided ({result.carbonSavingsPercent.toFixed(1)}%)</span>
+                </div>
+              </div>
+              <p className="text-neutral-400 text-sm">
+                Arboric takes 20% of what we save you. You keep the rest.
+              </p>
+              {annualSavings > 0 && (
+                <p className="mt-4 text-xl md:text-2xl font-bold text-white">
+                  At this usage running daily, that's{' '}
+                  <span className="text-green-400 font-mono">${Math.round(annualSavings).toLocaleString()}/year</span>{' '}
+                  you're leaving on the table.
+                </p>
+              )}
+              <p className="mt-6 text-xs text-neutral-500 leading-relaxed">
+                Projections based on simulated grid data modeled from public CAISO and ERCOT patterns. Production version integrates live data via WattTime and ISO feeds.
+              </p>
+            </div>
+          </div>
+        </section>
+      );
+    });
+
+    /* ---- Why Not Your Cloud Provider ---- */
+    function WhyNotCloud() {
+      const ref = useRef(null);
+      const vis = useInView(ref);
+      return (
+        <section className="py-24 bg-surface" ref={ref}>
+          <div className="max-w-5xl mx-auto px-6">
+            <h2 className="text-3xl md:text-4xl font-bold text-white text-center">
+              AWS won't tell you to run on Azure.
+            </h2>
+            <div className="mt-12 max-w-3xl mx-auto space-y-6 text-neutral-300 text-lg leading-relaxed">
+              <p>
+                Your cloud provider profits from every hour you're running. They have zero incentive to
+                move your job to a cheaper window &mdash; let alone a competitor's region.
+              </p>
+              <p>
+                Arboric is the neutral referee. We optimize across every cloud, every region, every hour.
+                Our only incentive is your savings.
+              </p>
+              <p className="text-white font-medium">
+                We make 20% of what we save you. If we save you nothing, you pay nothing.
+              </p>
+              <div className="pt-6 border-t border-neutral-600">
+                <p className="text-base text-neutral-300">
+                  <span className="text-green-400 font-semibold block mb-2">Typical savings:</span>
+                  <span className="block">$150K–$500K/year across multi-cloud deployments</span>
+                </p>
+              </div>
+            </div>
+
+            {/* Cloud visual */}
+            <div className={`mt-12 flex flex-col items-center ${vis ? 'anim-fade-up' : 'opacity-0'}`}>
+              <div className="flex items-center justify-center gap-6 md:gap-12 flex-wrap">
+                {['AWS', 'Azure', 'GCP'].map(name => (
+                  <div key={name} className="w-20 h-20 rounded-xl bg-bg border border-border flex items-center justify-center text-neutral-500 text-sm font-mono">
+                    {name}
+                  </div>
+                ))}
+              </div>
+              <div className="my-4 flex flex-col items-center">
+                <svg width="2" height="40" aria-hidden="true"><line x1="1" y1="0" x2="1" y2="40" stroke="#22c55e" strokeWidth="2" strokeDasharray="4 4"/></svg>
+              </div>
+              <div className="w-24 h-24 rounded-xl bg-green-500/10 border-2 border-green-500/40 flex items-center justify-center">
+                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                  <path d="M12 2L4 7v10l8 5 8-5V7l-8-5z" stroke="#22c55e" strokeWidth="2"/>
+                  <path d="M12 8v8M8 12h8" stroke="#22c55e" strokeWidth="2" strokeLinecap="round"/>
+                </svg>
+              </div>
+              <p className="mt-4 text-green-400 font-semibold text-sm tracking-wide">Best price. Lowest carbon. Any cloud.</p>
+            </div>
+
+            <div className="mt-12 text-center">
+              <a href="#calculator"
+                className="px-6 py-3 border border-green-500 hover:bg-green-500/10 text-green-400 hover:text-green-300 font-semibold rounded-lg transition-colors inline-block"
+                aria-label="See your cloud savings">
+                See What You'd Save
+              </a>
+            </div>
+          </div>
+        </section>
+      );
+    }
+
+    /* ---- Compliance ---- */
+    function Compliance() {
+      const ref = useRef(null);
+      const vis = useInView(ref);
+      const timeline = [
+        { year: '2024', label: 'SEC climate disclosure rules finalized', active: false },
+        { year: '2025', label: 'SB 253 Scope 1 & 2 reporting begins', active: false },
+        { year: '2026', label: 'EU CSRD takes effect for large companies', active: false },
+        { year: '2027', label: 'SB 253 Scope 3 mandatory', active: true },
+      ];
+      return (
+        <section id="compliance" className="py-24" ref={ref}>
+          <div className="max-w-5xl mx-auto px-6">
+            <h2 className="text-3xl md:text-4xl font-bold text-white text-center">
+              Audit-grade proof for every compute job.
+            </h2>
+
+            {/* Timeline */}
+            <div className="mt-12 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+              {timeline.map((t, i) => (
+                <div key={t.year} className={`flex-1 ${vis ? 'anim-fade-up' : 'opacity-0'} ${i > 0 ? `anim-delay-${i}` : ''}`}>
+                  <div className="flex items-center gap-3">
+                    <span className={`w-3 h-3 rounded-full ${t.active ? 'bg-amber-400' : 'bg-neutral-600'}`}/>
+                    {i < timeline.length - 1 && <div className="hidden md:block flex-1 h-px bg-border"/>}
+                  </div>
+                  <span className={`block mt-2 text-sm font-bold font-mono ${t.active ? 'text-amber-400' : 'text-neutral-400'}`}>
+                    {t.year}
+                  </span>
+                  <span className={`block text-xs ${t.active ? 'text-white font-semibold' : 'text-neutral-500'}`}>
+                    {t.label}
+                  </span>
+                </div>
+              ))}
+            </div>
+
+            {/* Carbon Receipt */}
+            <div className={`mt-12 max-w-lg mx-auto ${vis ? 'anim-fade-up anim-delay-3' : 'opacity-0'}`}>
+              <div className="bg-surface border border-border rounded-xl p-6 font-mono text-xs leading-loose">
+                <div className="text-center mb-4">
+                  <span className="text-white font-bold text-sm tracking-widest">CARBON EXECUTION RECEIPT</span>
+                </div>
+                <div className="border-t border-dashed border-neutral-700 pt-3 space-y-1">
+                  <div className="flex justify-between"><span className="text-neutral-500">Workload</span><span className="text-white">LLM Fine-tuning Run #4,291</span></div>
+                  <div className="flex justify-between"><span className="text-neutral-500">Region</span><span className="text-white">US-WEST (CAISO)</span></div>
+                  <div className="flex justify-between"><span className="text-neutral-500">Executed</span><span className="text-white">2027-03-15 13:00-21:00</span></div>
+                  <div className="flex justify-between"><span className="text-neutral-500">Energy</span><span className="text-white">960 kWh</span></div>
+                  <div className="flex justify-between"><span className="text-neutral-500">Carbon</span><span className="text-green-400">134.64 kg CO2e</span></div>
+                  <div className="flex justify-between"><span className="text-neutral-500">Baseline</span><span className="text-neutral-400">328.32 kg CO2e</span></div>
+                  <div className="flex justify-between"><span className="text-neutral-500">Avoided</span><span className="text-green-400 font-bold">193.68 kg CO2e (59.0%)</span></div>
+                  <div className="flex justify-between"><span className="text-neutral-500">Grid Source</span><span className="text-neutral-400">WattTime API v3</span></div>
+                </div>
+                <div className="border-t border-dashed border-neutral-700 mt-3 pt-3 text-center text-neutral-500">
+                  Arboric v2.1 &mdash; Verifiable. Auditable. Exportable.
+                </div>
+              </div>
+              <p className="text-center text-neutral-400 text-sm mt-4">
+                JSON, CSV, or API. Plug into any ESG reporting tool.
+              </p>
+            </div>
+          </div>
+        </section>
+      );
+    }
+
+    /* ---- Pricing ---- */
+    function Pricing() {
+      const ref = useRef(null);
+      const vis = useInView(ref);
+
+      // Animated flow steps
+      const flowSteps = [
+        '$10K training run',
+        'Arboric delays 6 hours',
+        'You save $4,150',
+        'You pay us $830',
+        'You pocket $3,320',
+      ];
+
+      const tiers = [
+        {
+          name: 'Core', price: 'Free', priceNote: 'Open source',
+          features: ['CLI + GitHub Actions', 'Single region (US-WEST)', 'Community support', 'Basic CSV export'],
+          cta: 'pip install arboric', ctaStyle: 'border border-border hover:border-neutral-500 text-white',
+        },
+        {
+          name: 'Pro', price: '$0.05', priceNote: '/optimized compute hour',
+          features: ['K8s Scheduler plugin', 'All 4 regions', 'REST API access', 'Email support, 48h SLA', 'Carbon receipts'],
+          cta: 'Start Free Trial', ctaStyle: 'bg-green-500 hover:bg-green-600 text-black font-semibold', highlight: true,
+        },
+        {
+          name: 'Enterprise', price: '$5,000', priceNote: '/mo + usage',
+          features: ['Everything in Pro', 'Custom regions + ISO feeds', 'Certified Carbon Receipts', 'ESG Audit Vault', 'Dedicated CSM, 4h SLA', 'SOC 2 compliance', 'Webhooks + integrations'],
+          cta: 'Talk to Us', ctaStyle: 'border border-border hover:border-neutral-500 text-white',
+        },
+      ];
+
+      return (
+        <section id="pricing" className="py-24 bg-surface" ref={ref}>
+          <div className="max-w-5xl mx-auto px-6">
+            <h2 className="text-3xl md:text-4xl font-bold text-white text-center">Pricing</h2>
+
+            {/* Animated flow */}
+            <div className={`mt-10 flex flex-col md:flex-row items-center justify-center gap-2 md:gap-3 ${vis ? 'anim-fade-up' : 'opacity-0'}`}>
+              {flowSteps.map((step, i) => (
+                <React.Fragment key={i}>
+                  <span className={`flow-step text-sm md:text-base font-mono px-3 py-1.5 rounded-lg ${
+                    i === flowSteps.length - 1
+                      ? 'bg-green-500/15 text-green-400 font-bold border border-green-500/30'
+                      : i === 3
+                        ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
+                        : 'bg-surface-2 text-neutral-300 border border-border'
+                  }`} style={{ animationDelay: `${i * 0.2 + 0.3}s` }}>
+                    {step}
+                  </span>
+                  {i < flowSteps.length - 1 && (
+                    <svg width="20" height="20" viewBox="0 0 20 20" className="text-neutral-600 hidden md:block flex-shrink-0" aria-hidden="true">
+                      <path d="M6 10h8M11 7l3 3-3 3" stroke="currentColor" strokeWidth="1.5" fill="none" strokeLinecap="round" strokeLinejoin="round"/>
+                    </svg>
+                  )}
+                </React.Fragment>
+              ))}
+            </div>
+
+            {/* Tiers */}
+            <div className="mt-12 grid md:grid-cols-3 gap-6">
+              {tiers.map(tier => (
+                <div key={tier.name} className={`rounded-xl border p-6 flex flex-col ${
+                  tier.highlight ? 'border-green-500/40 bg-green-500/5' : 'border-border bg-bg'
+                }`}>
+                  <h3 className="text-lg font-bold text-white">{tier.name}</h3>
+                  <div className="mt-3 mb-1">
+                    <span className="text-3xl font-extrabold text-white font-mono">{tier.price}</span>
+                    <span className="text-neutral-400 text-sm ml-1">{tier.priceNote}</span>
+                  </div>
+                  <ul className="mt-5 space-y-2.5 flex-1">
+                    {tier.features.map(f => (
+                      <li key={f} className="flex items-start gap-2 text-sm text-neutral-300">
+                        <svg width="16" height="16" viewBox="0 0 16 16" className="mt-0.5 flex-shrink-0 text-green-500" aria-hidden="true">
+                          <path d="M4 8l3 3 5-5" stroke="currentColor" strokeWidth="1.5" fill="none" strokeLinecap="round" strokeLinejoin="round"/>
+                        </svg>
+                        {f}
+                      </li>
+                    ))}
+                  </ul>
+                  <button className={`mt-6 w-full py-2.5 rounded-lg text-sm font-medium transition-colors ${tier.ctaStyle}`}
+                    aria-label={`${tier.cta} - ${tier.name} tier`}>
+                    {tier.cta}
+                  </button>
+                </div>
+              ))}
+            </div>
+
+            <p className="text-center text-neutral-500 text-sm mt-8">
+              No savings, no bill. Every tier includes a 30-day proof-of-value period.
+            </p>
+          </div>
+        </section>
+      );
+    }
+
+    /* ---- CTA / Footer ---- */
+    function Footer() {
+      return (
+        <section className="py-24 border-t border-border">
+          <div className="max-w-5xl mx-auto px-6">
+            <h2 className="text-3xl md:text-4xl font-bold text-white text-center">
+              Start saving in 5 minutes.
+            </h2>
+
+            <div className="mt-12 grid md:grid-cols-2 gap-8">
+              {/* Developer CTA */}
+              <div className="bg-surface rounded-xl border border-border p-6">
+                <h3 className="text-sm font-semibold text-green-400 uppercase tracking-wide mb-4">For developers</h3>
+                <pre className="bg-bg rounded-lg p-4 font-mono text-sm text-neutral-300 overflow-x-auto mb-4">
+{`pip install arboric
+
+arboric optimize "LLM Training" \\
+  --duration 8 --deadline 24 --power 120`}
+                </pre>
+                <p className="text-neutral-400 text-sm">See your first optimization in one command.</p>
+              </div>
+
+              {/* Enterprise CTA */}
+              <div className="bg-surface rounded-xl border border-border p-6 flex flex-col justify-between">
+                <div>
+                  <h3 className="text-sm font-semibold text-blue-400 uppercase tracking-wide mb-4">For enterprise</h3>
+                  <p className="text-neutral-300 text-lg">
+                    Running $500K+ in annual compute? Let's talk.
+                  </p>
+                  <p className="text-neutral-500 text-sm mt-2">
+                    We'll model your fleet savings and show you audit-ready carbon receipts for your compliance team.
+                  </p>
+                </div>
+                <a href="mailto:aashan5050@gmail.com"
+                  className="mt-6 block text-center py-3 bg-blue-500 hover:bg-blue-600 text-white font-semibold rounded-lg transition-colors"
+                  aria-label="Contact us to book a call">
+                  Book a 20-Minute Call
+                </a>
+              </div>
+            </div>
+
+            {/* Footer links */}
+            <div className="mt-16 pt-8 border-t border-border flex flex-col md:flex-row items-center justify-between gap-4">
+              <div className="flex items-center gap-2 text-neutral-500 text-sm">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                  <path d="M12 2L4 7v10l8 5 8-5V7l-8-5z" stroke="#22c55e" strokeWidth="2"/>
+                  <path d="M12 8v8M8 12h8" stroke="#22c55e" strokeWidth="2" strokeLinecap="round"/>
+                </svg>
+                Arboric &mdash; Where algorithms meet sustainability.
+              </div>
+              <div className="flex items-center gap-6 text-sm text-neutral-500">
+                <a href="https://github.com/aashanm/arboric" target="_blank" rel="noopener noreferrer" className="hover:text-white transition-colors">GitHub</a>
+                <a href="https://github.com/aashanm/arboric#-api-server" target="_blank" rel="noopener noreferrer" className="hover:text-white transition-colors">API Docs</a>
+                <a href="https://github.com/aashanm/arboric#readme" target="_blank" rel="noopener noreferrer" className="hover:text-white transition-colors">Docs</a>
+              </div>
+            </div>
+          </div>
+        </section>
+      );
+    }
+
+    /* ================================================================
+       APP
+       ================================================================ */
+    function App() {
+      return (
+        <React.Fragment>
+          <Nav />
+          <Hero />
+          <UrgencyBar />
+          <HowItWorks />
+          <Calculator />
+          <WhyNotCloud />
+          <Compliance />
+          <Pricing />
+          <Footer />
+        </React.Fragment>
+      );
+    }
+
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<App />);
+  </script>
+</body>
+</html>

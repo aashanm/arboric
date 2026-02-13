@@ -151,9 +151,6 @@ venv.bak/
 # Rope project settings
 .ropeproject
 
-# mkdocs documentation
-/site
-
 # mypy
 .mypy_cache/
 .dmypy.json
@@ -211,3 +208,6 @@ __marimo__/
 
 # OS generated files
 .DS_Store
+
+# Arboric Pitch Doc
+arboric_pitch_doc.pdf
