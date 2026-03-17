@@ -54,6 +54,14 @@ class APISettings(BaseModel):
     watttime_username: str | None = Field(default=None, description="WattTime API username")
     watttime_password: str | None = Field(default=None, description="WattTime API password")
     watttime_enabled: bool = Field(default=False, description="Enable WattTime integration")
+    electricity_maps_api_key: str | None = Field(default=None, description="Electricity Maps API key")
+    electricity_maps_enabled: bool = Field(default=False, description="Enable Electricity Maps integration")
+
+    @property
+    def live_mode_enabled(self) -> bool:
+        """Check if any live data source is configured and enabled."""
+        return (self.watttime_enabled and bool(self.watttime_username)) or \
+               (self.electricity_maps_enabled and bool(self.electricity_maps_api_key))
 
 
 class CLISettings(BaseModel):

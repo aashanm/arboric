@@ -211,3 +211,6 @@ __marimo__/
 
 # Arboric Pitch Doc
 arboric_pitch_doc.pdf
+
+# Config file
+config.yaml

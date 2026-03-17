@@ -13,11 +13,18 @@ pydantic>=2.0.0
 # Time-series data handling
 pandas>=2.0.0
 
+# Configuration
+pyyaml>=6.0.0
+
+# Web API and HTTP
+fastapi>=0.109.0
+uvicorn[standard]>=0.27.0
+httpx>=0.26.0
+
 # Type stubs (development)
 pandas-stubs>=2.0.0
 
 # Optional: For future production integrations
-# httpx>=0.25.0        # Async HTTP client for API calls
 # aiohttp>=3.9.0       # Alternative async HTTP
 # python-dotenv>=1.0.0 # Environment configuration
 # structlog>=23.0.0    # Structured logging

@@ -31,6 +31,20 @@ async def get_status(config: ArboricConfig = Depends(get_arboric_config)):
     """
     uptime_seconds = (datetime.now() - _server_start_time).total_seconds()
 
+    # Determine grid mode and data sources
+    api_config = config.api
+    grid_mode = "live" if api_config.live_mode_enabled else "simulation"
+    data_sources = []
+
+    if api_config.watttime_enabled and api_config.watttime_username:
+        data_sources.append("watttime")
+    if api_config.electricity_maps_enabled and api_config.electricity_maps_api_key:
+        data_sources.append("electricity_maps")
+    if not data_sources:
+        data_sources.append("mockgrid")
+
+    grid_type = "LiveGrid" if api_config.live_mode_enabled else "MockGrid"
+
     data = {
         "service": {
             "name": "arboric-api",
@@ -39,7 +53,12 @@ async def get_status(config: ArboricConfig = Depends(get_arboric_config)):
             "uptime_seconds": uptime_seconds,
         },
         "components": {
-            "grid_oracle": {"status": "online", "type": "MockGrid", "mode": "simulation"},
+            "grid_oracle": {
+                "status": "online",
+                "type": grid_type,
+                "mode": grid_mode,
+                "data_sources": data_sources,
+            },
             "autopilot": {"status": "ready", "version": "1.0.0"},
             "supported_regions": ["US-WEST", "US-EAST", "EU-WEST", "NORDIC"],
         },

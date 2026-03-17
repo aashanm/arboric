@@ -1,0 +1,171 @@
+name: 'Arboric – Carbon-Aware Job Scheduler'
+description: 'Find the cheapest, greenest window to run compute workloads. Zero config, instant integration.'
+author: 'Arboric'
+
+branding:
+  icon: 'zap'
+  color: 'green'
+
+inputs:
+  job-name:
+    description: 'Name of the compute workload to optimize'
+    required: false
+    default: ''
+
+  duration:
+    description: 'Estimated runtime in hours'
+    required: false
+    default: '4'
+
+  power-kw:
+    description: 'Power draw in kilowatts'
+    required: false
+    default: '50'
+
+  deadline:
+    description: 'Job must complete within N hours from now'
+    required: false
+    default: '24'
+
+  region:
+    description: 'Grid region (US-WEST, US-EAST, EU-WEST, NORDIC)'
+    required: false
+    default: 'US-WEST'
+
+  watttime-username:
+    description: '[Optional] WattTime API username'
+    required: false
+    default: ''
+
+  watttime-password:
+    description: '[Optional] WattTime API password'
+    required: false
+    default: ''
+
+  electricity-maps-key:
+    description: '[Optional] Electricity Maps API key'
+    required: false
+    default: ''
+
+  comment-on-pr:
+    description: 'Post optimization results as PR comment'
+    required: false
+    default: 'false'
+
+  github-token:
+    description: 'GitHub token for PR comments'
+    required: false
+    default: ''
+
+outputs:
+  optimal-start:
+    description: 'ISO 8601 timestamp for optimal start'
+    value: ${{ steps.parse.outputs.optimal_start }}
+
+  delay-hours:
+    description: 'Hours to delay to reach optimal window'
+    value: ${{ steps.parse.outputs.delay_hours }}
+
+  cost-savings-percent:
+    description: 'Cost savings percentage'
+    value: ${{ steps.parse.outputs.cost_savings_percent }}
+
+  carbon-savings-kg:
+    description: 'CO₂ avoided in kilograms'
+    value: ${{ steps.parse.outputs.carbon_savings_kg }}
+
+runs:
+  using: 'composite'
+
+  steps:
+    - name: Install Arboric
+      shell: bash
+      run: pip install arboric --quiet
+
+    - name: Setup live data config
+      shell: bash
+      if: ${{ inputs.watttime-username != '' || inputs.electricity-maps-key != '' }}
+      run: |
+        mkdir -p ~/.arboric
+        cat > ~/.arboric/config.yaml << 'CONFIGEOF'
+        api:
+          watttime_username: ${{ inputs.watttime-username }}
+          watttime_password: ${{ inputs.watttime-password }}
+          watttime_enabled: ${{ inputs.watttime-username != '' && 'true' || 'false' }}
+          electricity_maps_api_key: ${{ inputs.electricity-maps-key }}
+          electricity_maps_enabled: ${{ inputs.electricity-maps-key != '' && 'true' || 'false' }}
+        CONFIGEOF
+
+    - name: Run optimization
+      id: optimize
+      shell: bash
+      run: |
+        JOB="${{ inputs.job-name }}"
+        JOB="${JOB:-${GITHUB_WORKFLOW}}"
+        arboric optimize "$JOB" \
+          --duration "${{ inputs.duration }}" \
+          --power "${{ inputs.power-kw }}" \
+          --deadline "${{ inputs.deadline }}" \
+          --region "${{ inputs.region }}" \
+          --quiet \
+          --output "${RUNNER_TEMP}/arboric.json" \
+          --format json
+
+    - name: Parse outputs
+      id: parse
+      shell: python3
+      run: |
+        import json
+        import os
+        result = json.load(open(os.path.join(os.environ['RUNNER_TEMP'], 'arboric.json')))
+        d = result['data']
+        out = open(os.environ['GITHUB_OUTPUT'], 'a')
+        out.write(f"optimal_start={d['optimization']['optimal_start']}\n")
+        out.write(f"delay_hours={d['optimization']['delay_hours']}\n")
+        out.write(f"cost_savings_percent={round(d['metrics']['savings']['cost_percent'], 1)}\n")
+        out.write(f"carbon_savings_kg={round(d['metrics']['savings']['carbon_kg'], 3)}\n")
+        out.close()
+
+    - name: Post PR comment
+      if: ${{ inputs.comment-on-pr == 'true' && github.event_name == 'pull_request' }}
+      shell: python3
+      run: |
+        import json
+        import os
+        import urllib.request
+        result = json.load(open(os.path.join(os.environ['RUNNER_TEMP'], 'arboric.json')))
+        d, w, opt, m, s = result['data'], result['data']['workload'], result['data']['optimization'], result['data']['metrics'], result['data']['metrics']['savings']
+        delay = float(opt.get('delay_hours', 0))
+        timing = f"⏰ **Optimal:** {opt['optimal_start']} (delay {delay:.1f}h)" if delay > 0.5 else "✅ **Run now** — this is optimal"
+        lines = [
+          "## ⚡ Arboric: Carbon-Aware Schedule",
+          "",
+          f"**Job:** `{w['name']}` · {w['duration_hours']}h @ {w['power_draw_kw']} kW",
+          "",
+          "| | Run Now | Optimal | Savings |",
+          "|---|---|---|---|",
+          f"| 💰 Cost | ${m['baseline']['cost']:.2f} | ${m['optimized']['cost']:.2f} | **{s['cost_percent']:.1f}% less** |",
+          f"| 🌱 Carbon | {m['baseline']['carbon_kg']:.2f} kg | {m['optimized']['carbon_kg']:.2f} kg | **{s['carbon_kg']:.2f} kg saved** |",
+          "",
+          timing,
+          "",
+          "<sub>Powered by [Arboric](https://arboric.dev)</sub>",
+        ]
+        body = "\n".join(lines)
+        token = os.environ.get('GH_TOKEN', '')
+        repo = os.environ['GITHUB_REPOSITORY']
+        pr = os.environ['GITHUB_REF'].split('/')[-2]
+        url = f"https://api.github.com/repos/{repo}/issues/{pr}/comments"
+        req = urllib.request.Request(url, json.dumps({"body": body}).encode(), {
+            "Authorization": f"Bearer {token}",
+            "Accept": "application/vnd.github+json",
+            "Content-Type": "application/json",
+            "X-GitHub-Api-Version": "2022-11-28",
+        }, method="POST")
+        try:
+            with urllib.request.urlopen(req):
+                print("✓ Posted PR comment")
+        except:
+            print("⚠ Could not post PR comment")
+      env:
+        GH_TOKEN: ${{ inputs.github-token }}

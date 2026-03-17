@@ -37,11 +37,16 @@ defaults:
 
 # External API integration settings
 api:
-  # WattTime API credentials (for real-time carbon data)
+  # WattTime API credentials (for real-time carbon intensity data)
   # Leave empty to use MockGrid simulation
   watttime_username: null
   watttime_password: null
   watttime_enabled: false
+
+  # Electricity Maps API key (for real-time carbon and price data)
+  # Get your free API key at https://api.electricitymap.org
+  electricity_maps_api_key: null
+  electricity_maps_enabled: false
 
 # CLI display and behavior settings
 cli:

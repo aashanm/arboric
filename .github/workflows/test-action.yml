@@ -1,0 +1,70 @@
+name: Test Arboric Action
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+jobs:
+  test-action-zero-config:
+    name: Test Action (Zero Config)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run Arboric Action (minimal)
+        uses: ./
+        id: arboric
+
+      - name: Display outputs
+        run: |
+          echo "Optimal start: ${{ steps.arboric.outputs.optimal-start }}"
+          echo "Delay: ${{ steps.arboric.outputs.delay-hours }}h"
+          echo "Cost savings: ${{ steps.arboric.outputs.cost-savings-percent }}%"
+          echo "Carbon savings: ${{ steps.arboric.outputs.carbon-savings-kg }} kg CO₂"
+
+  test-action-with-params:
+    name: Test Action (Custom Parameters)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run Arboric Action (custom params)
+        uses: ./
+        id: arboric
+        with:
+          job-name: 'Nightly Model Training'
+          duration: '8'
+          power-kw: '120'
+          deadline: '24'
+          region: 'US-WEST'
+
+      - name: Verify outputs are valid
+        run: |
+          # Check that all outputs are populated and not empty
+          [[ -n "${{ steps.arboric.outputs.optimal-start }}" ]] || exit 1
+          [[ -n "${{ steps.arboric.outputs.delay-hours }}" ]] || exit 1
+          [[ -n "${{ steps.arboric.outputs.cost-savings-percent }}" ]] || exit 1
+          [[ -n "${{ steps.arboric.outputs.carbon-savings-kg }}" ]] || exit 1
+          echo "✓ All outputs populated"
+
+  test-action-pr-comment:
+    name: Test Action (PR Comment)
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run Arboric Action with PR comment
+        uses: ./
+        id: arboric
+        with:
+          job-name: 'PR Test Job'
+          duration: '2'
+          power-kw: '75'
+          comment-on-pr: 'true'
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Confirm action completed
+        run: echo "✓ Action completed, PR comment should be posted"

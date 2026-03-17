@@ -13,7 +13,7 @@ In production, this module would integrate with:
 
 import math
 import random
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 import pandas as pd
 
@@ -349,6 +349,327 @@ class MockGrid:
         return events
 
 
-def get_grid(region: str = "US-WEST") -> MockGrid:
-    """Factory function to create a grid oracle for a region."""
+class LiveGrid:
+    """Real-time grid data from WattTime and Electricity Maps APIs.
+
+    Implements the same interface as MockGrid but uses live data sources.
+    Falls back to REGION_PROFILES-based simulation when APIs are unavailable
+    or if data cannot be fetched.
+    """
+
+    def __init__(
+        self,
+        region: str,
+        watttime_client=None,  # type: ignore
+        em_client=None,  # type: ignore
+    ):
+        """Initialize LiveGrid with API clients.
+
+        Args:
+            region: Grid region identifier (US-WEST, US-EAST, EU-WEST, NORDIC)
+            watttime_client: Optional WattTimeClient instance
+            em_client: Optional ElectricityMapsClient instance
+        """
+        self.region = region
+        if region not in REGION_PROFILES:
+            raise ValueError(f"Unknown region: {region}. Available: {list(REGION_PROFILES.keys())}")
+
+        self.profile = REGION_PROFILES[region]
+        self._watttime = watttime_client
+        self._em = em_client
+        # Fallback mock grid for missing data
+        self._mock = MockGrid(region=region, seed=42)
+
+    def _get_carbon_forecast(self, hours: int) -> list[dict] | None:
+        """Try to fetch carbon forecast from APIs.
+
+        Returns:
+            List of dicts with 'timestamp' and 'co2_intensity', or None if unavailable
+        """
+        # Try WattTime first (specialized for carbon)
+        if self._watttime:
+            try:
+                return self._watttime.get_carbon_forecast(self.region, hours)
+            except Exception as e:
+                import logging
+                logging.debug(f"WattTime carbon forecast failed: {e}")
+
+        # Try Electricity Maps as backup
+        if self._em:
+            try:
+                return self._em.get_carbon_forecast(self.region)
+            except Exception as e:
+                import logging
+                logging.debug(f"Electricity Maps carbon forecast failed: {e}")
+
+        return None
+
+    def _get_price_data(self) -> float | None:
+        """Try to fetch current price from Electricity Maps.
+
+        Returns:
+            Current price in $/kWh, or None if unavailable
+        """
+        if self._em:
+            try:
+                return self._em.get_price(self.region)
+            except Exception as e:
+                import logging
+                logging.debug(f"Electricity Maps price fetch failed: {e}")
+        return None
+
+    def _get_renewable_percentage(self) -> float | None:
+        """Try to fetch renewable percentage from Electricity Maps.
+
+        Returns:
+            Renewable percentage (0-100), or None if unavailable
+        """
+        if self._em:
+            try:
+                return self._em.get_renewable_percentage(self.region)
+            except Exception as e:
+                import logging
+                logging.debug(f"Electricity Maps renewable fetch failed: {e}")
+        return None
+
+    def _get_mock_value(self, mock_df: pd.DataFrame, timestamp: datetime, column: str) -> float:
+        """Get value from mock grid DataFrame, using nearest neighbor if exact timestamp missing.
+
+        Args:
+            mock_df: Mock grid DataFrame
+            timestamp: Timestamp to look up
+            column: Column name to extract
+
+        Returns:
+            Value from DataFrame or nearest neighbor
+        """
+        # Convert to naive datetime if needed
+        ts_naive = timestamp.replace(tzinfo=None) if timestamp.tzinfo else timestamp
+
+        # Try exact lookup first
+        if ts_naive in mock_df.index:
+            return mock_df.loc[ts_naive, column]
+
+        # Fall back to nearest timestamp
+        nearest = mock_df.index.get_indexer([ts_naive], method='nearest')[0]
+        if 0 <= nearest < len(mock_df):
+            return mock_df.iloc[nearest][column]
+
+        # Last resort: return mock grid value
+        hour_of_day = timestamp.hour + timestamp.minute / 60
+        if column == "co2_intensity":
+            return self._mock._calculate_carbon_intensity(hour_of_day)
+        elif column == "price":
+            return self._mock._calculate_price(hour_of_day)
+        elif column == "renewable_percentage":
+            return self._mock._calculate_renewable_percentage(hour_of_day)
+        else:
+            return 0.0
+
+    def get_forecast(
+        self, hours: int = 24, resolution_minutes: int = 60, start_time: datetime | None = None
+    ) -> pd.DataFrame:
+        """Fetch real grid forecast with fallback to simulation.
+
+        Args:
+            hours: Forecast horizon in hours
+            resolution_minutes: Time resolution (default 60 = hourly)
+            start_time: Optional start time (defaults to current time)
+
+        Returns:
+            DataFrame with timestamp, co2_intensity, price, renewable_percentage, confidence
+        """
+        # Ensure we use timezone-aware UTC datetime for consistency with API data
+        if start_time is None:
+            now = datetime.now(timezone.utc)
+        elif start_time.tzinfo is None:
+            now = start_time.replace(tzinfo=timezone.utc)
+        else:
+            now = start_time
+        now = now.replace(minute=0, second=0, microsecond=0)
+        windows = []
+
+        # Try to get real data
+        carbon_forecast = self._get_carbon_forecast(hours)
+        current_price = self._get_price_data()
+        current_renewable = self._get_renewable_percentage()
+
+        # Get mock forecast as fallback
+        mock_forecast_df = self._mock.get_forecast(hours, resolution_minutes, start_time)
+
+        intervals = (hours * 60) // resolution_minutes
+
+        for i in range(intervals):
+            timestamp = now + timedelta(minutes=i * resolution_minutes)
+
+            # Determine confidence and data source
+            # Real data in first 4h has high confidence
+            # Real data beyond 4h has medium confidence
+            # Fallback data has low confidence
+            use_real_carbon = carbon_forecast is not None
+            use_real_price = current_price is not None
+            use_real_renewable = current_renewable is not None
+
+            # Set confidence based on data source and time horizon
+            if i <= 4:  # First 4 hours
+                confidence = 1.0 if (use_real_carbon or use_real_price) else 0.5
+            elif i <= 12:  # Up to 12 hours
+                confidence = 0.85 if (use_real_carbon or use_real_price) else 0.5
+            else:  # Beyond 12 hours
+                confidence = 0.7 if (use_real_carbon or use_real_price) else 0.5
+
+            # Get CO2 intensity
+            if use_real_carbon and carbon_forecast:
+                # Find the closest forecast point to this timestamp
+                closest = min(
+                    (p for p in carbon_forecast),
+                    key=lambda p: abs((p["timestamp"] - timestamp).total_seconds()),
+                    default=None,
+                )
+                co2 = closest["co2_intensity"] if closest else self._get_mock_value(mock_forecast_df, timestamp, "co2_intensity")
+            else:
+                co2 = self._get_mock_value(mock_forecast_df, timestamp, "co2_intensity")
+
+            # Get price (extend current price across horizon with small variation)
+            if use_real_price and current_price:
+                # Add small Gaussian noise for realism
+                noise = (datetime.now().timestamp() + i) % 0.01  # Deterministic pseudo-random
+                price = max(0.02, min(0.50, current_price * (1.0 + (noise - 0.005))))
+            else:
+                price = self._get_mock_value(mock_forecast_df, timestamp, "price")
+
+            # Get renewable percentage
+            if use_real_renewable and current_renewable is not None:
+                renewable = current_renewable
+            else:
+                renewable = self._get_mock_value(mock_forecast_df, timestamp, "renewable_percentage")
+
+            window = GridWindow(
+                timestamp=timestamp,
+                co2_intensity=max(50, min(800, co2)),
+                price=max(0.02, min(0.50, price)),
+                renewable_percentage=max(5, min(95, renewable)),
+                region=self.region,
+                confidence=confidence,
+            )
+            windows.append(window)
+
+        # Convert to DataFrame
+        df = pd.DataFrame([w.model_dump() for w in windows])
+        df["timestamp"] = pd.to_datetime(df["timestamp"])
+        df = df.set_index("timestamp")
+
+        return df
+
+    def get_current_conditions(self) -> GridWindow:
+        """Fetch real-time grid conditions with fallback.
+
+        Returns:
+            GridWindow with current conditions
+        """
+        now = datetime.now()
+
+        # Try to get real-time data
+        try:
+            if self._watttime:
+                co2 = self._watttime.get_current_carbon(self.region)
+            elif self._em:
+                co2 = self._em.get_carbon_intensity(self.region)
+            else:
+                co2 = None
+        except Exception:
+            co2 = None
+
+        try:
+            if self._em:
+                price = self._em.get_price(self.region)
+            else:
+                price = None
+        except Exception:
+            price = None
+
+        try:
+            if self._em:
+                renewable = self._em.get_renewable_percentage(self.region)
+            else:
+                renewable = None
+        except Exception:
+            renewable = None
+
+        # Fall back to mock grid if needed
+        if co2 is None or price is None or renewable is None:
+            mock_conditions = self._mock.get_current_conditions()
+            if co2 is None:
+                co2 = mock_conditions.co2_intensity
+            if price is None:
+                price = mock_conditions.price
+            if renewable is None:
+                renewable = mock_conditions.renewable_percentage
+            confidence = 0.5  # Low confidence for fallback data
+        else:
+            confidence = 1.0  # High confidence for all real data
+
+        return GridWindow(
+            timestamp=now,
+            co2_intensity=max(50, min(800, co2)),
+            price=max(0.02, min(0.50, price)),
+            renewable_percentage=max(5, min(95, renewable)),
+            region=self.region,
+            confidence=confidence,
+        )
+
+    def detect_events(self, forecast_df: pd.DataFrame) -> list[dict]:
+        """Detect notable grid events (delegates to mock grid logic).
+
+        Args:
+            forecast_df: DataFrame with forecast data
+
+        Returns:
+            List of event dicts
+        """
+        return self._mock.detect_events(forecast_df)
+
+
+def get_grid(region: str = "US-WEST", config=None) -> MockGrid | LiveGrid:  # type: ignore
+    """Factory function to create a grid oracle for a region.
+
+    Returns LiveGrid if API credentials are configured, else MockGrid.
+
+    Args:
+        region: Grid region identifier
+        config: Optional ArboricConfig instance (loaded from file if None)
+
+    Returns:
+        LiveGrid if live data sources configured, else MockGrid
+    """
+    if config is None:
+        from arboric.core.config import get_config
+        config = get_config()
+
+    api = config.api
+    watttime_client = None
+    em_client = None
+
+    # Only create API clients if enabled and credentials present
+    if api.watttime_enabled and api.watttime_username and api.watttime_password:
+        try:
+            from arboric.integrations.watttime import WattTimeClient
+            watttime_client = WattTimeClient(api.watttime_username, api.watttime_password)
+        except Exception as e:
+            import logging
+            logging.warning(f"Failed to initialize WattTime client: {e}")
+
+    if api.electricity_maps_enabled and api.electricity_maps_api_key:
+        try:
+            from arboric.integrations.electricity_maps import ElectricityMapsClient
+            em_client = ElectricityMapsClient(api.electricity_maps_api_key)
+        except Exception as e:
+            import logging
+            logging.warning(f"Failed to initialize Electricity Maps client: {e}")
+
+    # Return LiveGrid if we have at least one API client
+    if watttime_client or em_client:
+        return LiveGrid(region=region, watttime_client=watttime_client, em_client=em_client)
+
+    # Fall back to MockGrid
     return MockGrid(region=region)
