@@ -67,9 +67,9 @@ dev = [
 arboric = "arboric.cli.main:main"
 
 [project.urls]
-Homepage = "https://github.com/arboric/arboric"
+Homepage = "https://github.com/aashanm/arboric"
 Documentation = "https://docs.arboric.dev"
-Repository = "https://github.com/arboric/arboric"
+Repository = "https://github.com/aashanm/arboric"
 
 [tool.setuptools.packages.find]
 where = ["."]

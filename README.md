@@ -256,7 +256,7 @@ pip install arboric
 ### Install for Development
 ```bash
 # Clone the repository
-git clone https://github.com/arboric/arboric.git
+git clone https://github.com/aashanm/arboric.git
 cd arboric
 
 # Create virtual environment
@@ -366,6 +366,6 @@ Arboric is released under the [MIT License](LICENSE).
 
 ## Getting Help
 
-- **Questions?** Open an issue on [GitHub](https://github.com/arboric/arboric)
-- **Want to contribute?** PRs welcome. See [CLAUDE.md](CLAUDE.md) for dev setup.
-- **Feedback?** Reach out to team@arboric.dev
+- **Questions?** Open an issue on [GitHub](https://github.com/aashanm/arboric)
+- **Want to contribute?** PRs welcome.
+- **Feedback?** Reach out to aashan5050@gmail.com or solapuramaparna2000@gmail.com.

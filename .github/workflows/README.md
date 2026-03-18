@@ -52,8 +52,8 @@ Automated PyPI publishing:
 The following badges are displayed in the README:
 
 ```markdown
-[![Tests](https://github.com/arboric/arboric/actions/workflows/test.yml/badge.svg)](https://github.com/arboric/arboric/actions/workflows/test.yml)
-[![Lint](https://github.com/arboric/arboric/actions/workflows/lint.yml/badge.svg)](https://github.com/arboric/arboric/actions/workflows/lint.yml)
+[![Tests](https://github.com/aashanm/arboric/actions/workflows/test.yml/badge.svg)](https://github.com/aashanm/arboric/actions/workflows/test.yml)
+[![Lint](https://github.com/aashanm/arboric/actions/workflows/lint.yml/badge.svg)](https://github.com/aashanm/arboric/actions/workflows/lint.yml)
 ```
 
 ## Local Development
