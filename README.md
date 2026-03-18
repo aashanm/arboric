@@ -2,6 +2,7 @@
 
 **Intelligent autopilot for cloud infrastructure that schedules AI workloads during optimal energy windows to minimize cost and carbon emissions.**
 
+[![PyPI version](https://img.shields.io/pypi/v/arboric.svg)](https://pypi.org/project/arboric/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](https://opensource.org/licenses/MIT)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 
@@ -27,6 +28,11 @@ Arboric learns your grid's duck curve and automatically delays flexible workload
 ## 🚀 Quick Start
 
 ### Install & Run
+
+[View on PyPI →](https://pypi.org/project/arboric/)
+
+```bash
+pip install arboric
 
 ```bash
 pip install arboric
@@ -366,6 +372,7 @@ Arboric is released under the [MIT License](LICENSE).
 
 ## Getting Help
 
+- **Package:** [PyPI Listing](https://pypi.org/project/arboric/)
 - **Questions?** Open an issue on [GitHub](https://github.com/aashanm/arboric)
 - **Want to contribute?** PRs welcome.
 - **Feedback?** Reach out to aashan5050@gmail.com or solapuramaparna2000@gmail.com.
