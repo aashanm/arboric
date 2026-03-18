@@ -75,7 +75,7 @@ runs:
   steps:
     - name: Install Arboric
       shell: bash
-      run: pip install arboric --quiet
+      run: pip install . --quiet
 
     - name: Setup live data config
       shell: bash

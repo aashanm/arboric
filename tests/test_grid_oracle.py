@@ -4,9 +4,6 @@ Tests for Arboric Grid Oracle
 Tests forecast generation, regional profiles, and grid event detection.
 """
 
-from datetime import datetime, timedelta, timezone
-from unittest.mock import MagicMock, patch
-
 import pandas as pd
 import pytest
 

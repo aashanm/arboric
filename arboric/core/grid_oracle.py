@@ -13,7 +13,7 @@ This package provides MockGrid simulation; live integrations are available separ
 
 import math
 import random
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 
 import pandas as pd
 
@@ -349,8 +349,6 @@ class MockGrid:
         return events
 
 
-
-
 def get_grid(region: str = "US-WEST", config=None) -> MockGrid:  # type: ignore
     """Factory function to create a grid oracle for a region.
 
@@ -366,6 +364,7 @@ def get_grid(region: str = "US-WEST", config=None) -> MockGrid:  # type: ignore
     """
     if config is None:
         from arboric.core.config import get_config
+
         config = get_config()
 
     api = config.api
@@ -375,10 +374,12 @@ def get_grid(region: str = "US-WEST", config=None) -> MockGrid:  # type: ignore
         try:
             # Try to import from the optional arboric-cloud package
             from arboric_cloud import create_live_grid
+
             return create_live_grid(api.live_api_username, api.live_api_password, region)
         except ImportError:
             # arboric-cloud not installed, fall back to MockGrid
             import logging
+
             logging.info(
                 "arboric-cloud not installed or LiveGrid unavailable. "
                 "Using MockGrid simulation. Install with: pip install arboric[cloud]"
@@ -386,6 +387,7 @@ def get_grid(region: str = "US-WEST", config=None) -> MockGrid:  # type: ignore
         except Exception as e:
             # Other error (auth, connection, etc.), log and fall back
             import logging
+
             logging.warning(f"Failed to initialize LiveGrid: {e}. Falling back to MockGrid.")
 
     # Default: return MockGrid simulation

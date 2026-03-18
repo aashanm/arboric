@@ -929,7 +929,8 @@ def status():
     console.print()
 
     # Determine actual grid type being used
-    from arboric.core.grid_oracle import get_grid, MockGrid
+    from arboric.core.grid_oracle import get_grid
+
     config = get_config()
     grid = get_grid(region="US-WEST", config=config)
     grid_type = type(grid).__name__
@@ -969,12 +970,18 @@ def status():
         data_sources.append("MockGrid")
 
     data_source_text = " + ".join(data_sources)
-    api_status = f"[{ARBORIC_GREEN}]● {data_source_text}[/{ARBORIC_GREEN}]" if "Live Data" in data_source_text else f"[{ARBORIC_AMBER}]○ {data_source_text}[/{ARBORIC_AMBER}]"
+    api_status = (
+        f"[{ARBORIC_GREEN}]● {data_source_text}[/{ARBORIC_GREEN}]"
+        if "Live Data" in data_source_text
+        else f"[{ARBORIC_AMBER}]○ {data_source_text}[/{ARBORIC_AMBER}]"
+    )
 
     status_table.add_row(
         "API Integration",
         api_status,
-        "Live carbon data + simulated pricing" if "Live Data" in data_source_text else "Simulated grid data",
+        "Live carbon data + simulated pricing"
+        if "Live Data" in data_source_text
+        else "Simulated grid data",
     )
 
     console.print(status_table)
@@ -1055,9 +1062,7 @@ def config(
 
             # API settings
             if cfg.api.live_api_enabled:
-                console.print(
-                    f"[{ARBORIC_GREEN}]✓[/{ARBORIC_GREEN}] Live data integration enabled"
-                )
+                console.print(f"[{ARBORIC_GREEN}]✓[/{ARBORIC_GREEN}] Live data integration enabled")
             else:
                 console.print(
                     f"[{ARBORIC_AMBER}]○[/{ARBORIC_AMBER}] Live data integration disabled"
