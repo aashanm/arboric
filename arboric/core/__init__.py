@@ -7,7 +7,7 @@ and grid forecasting.
 
 from arboric.core.autopilot import Autopilot, OptimizationConfig, create_autopilot
 from arboric.core.config import (
-    APISettings,
+    LiveDataSettings,
     ArboricConfig,
     CLISettings,
     DefaultWorkloadSettings,
@@ -44,7 +44,7 @@ __all__ = [
     "ArboricConfig",
     "OptimizationSettings",
     "DefaultWorkloadSettings",
-    "APISettings",
+    "LiveDataSettings",
     "CLISettings",
     "get_config",
     "reset_config",

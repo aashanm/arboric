@@ -27,7 +27,7 @@ async def get_config(config: ArboricConfig = Depends(get_arboric_config)):
     """
     data = {
         "optimization": {
-            "price_weight": config.optimization.price_weight,
+            "cost_weight": config.optimization.cost_weight,
             "carbon_weight": config.optimization.carbon_weight,
             "min_delay_hours": config.optimization.min_delay_hours,
             "prefer_continuous": config.optimization.prefer_continuous,
@@ -38,7 +38,7 @@ async def get_config(config: ArboricConfig = Depends(get_arboric_config)):
             "deadline_hours": config.defaults.deadline_hours,
             "region": config.defaults.region,
         },
-        "api": {"live_api_enabled": config.api.live_api_enabled},
+        "live_data": {"enabled": config.live_data.enabled},
     }
 
     return create_api_response("config", data)

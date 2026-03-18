@@ -281,7 +281,7 @@ def optimize(
 
     # Create autopilot with config-based optimization settings
     opt_config = OptimizationConfig(
-        price_weight=cfg.optimization.price_weight,
+        cost_weight=cfg.optimization.cost_weight,
         carbon_weight=cfg.optimization.carbon_weight,
         min_delay_hours=cfg.optimization.min_delay_hours,
         prefer_continuous=cfg.optimization.prefer_continuous,
@@ -436,7 +436,7 @@ def tradeoff(
     forecast = grid.get_forecast(hours=int(deadline) + int(duration) + 2)
 
     opt_config = OptimizationConfig(
-        price_weight=cfg.optimization.price_weight,
+        cost_weight=cfg.optimization.cost_weight,
         carbon_weight=cfg.optimization.carbon_weight,
         min_delay_hours=cfg.optimization.min_delay_hours,
         prefer_continuous=cfg.optimization.prefer_continuous,
@@ -1021,7 +1021,7 @@ def config(
             opt_table.add_column("Setting", style="white")
             opt_table.add_column("Value", style=f"bold {ARBORIC_GREEN}", justify="right")
 
-            opt_table.add_row("Price Weight", f"{cfg.optimization.price_weight:.1%}")
+            opt_table.add_row("Cost Weight", f"{cfg.optimization.cost_weight:.1%}")
             opt_table.add_row("Carbon Weight", f"{cfg.optimization.carbon_weight:.1%}")
             opt_table.add_row("Min Delay (hours)", f"{cfg.optimization.min_delay_hours}")
             opt_table.add_row("Prefer Continuous", str(cfg.optimization.prefer_continuous))

@@ -74,6 +74,6 @@ def test_config_endpoint(client):
 
     # Check optimization config
     optimization = config_data["optimization"]
-    assert "price_weight" in optimization
+    assert "cost_weight" in optimization
     assert "carbon_weight" in optimization
-    assert optimization["price_weight"] + optimization["carbon_weight"] == 1.0
+    assert optimization["cost_weight"] + optimization["carbon_weight"] == 1.0

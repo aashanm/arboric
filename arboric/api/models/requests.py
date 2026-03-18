@@ -12,8 +12,8 @@ from arboric.core.models import Workload
 class OptimizationConfigRequest(BaseModel):
     """API request model for optimization configuration."""
 
-    price_weight: float = Field(
-        default=0.7, ge=0.0, le=1.0, description="Weight for price optimization (0-1)"
+    cost_weight: float = Field(
+        default=0.7, ge=0.0, le=1.0, description="Weight for cost optimization (0-1)"
     )
     carbon_weight: float = Field(
         default=0.3, ge=0.0, le=1.0, description="Weight for carbon optimization (0-1)"
@@ -26,9 +26,9 @@ class OptimizationConfigRequest(BaseModel):
     @model_validator(mode="after")
     def validate_weights(self) -> "OptimizationConfigRequest":
         """Validate that weights sum to 1.0."""
-        total = self.price_weight + self.carbon_weight
+        total = self.cost_weight + self.carbon_weight
         if abs(total - 1.0) > 0.001:  # Allow small floating point errors
-            raise ValueError(f"price_weight and carbon_weight must sum to 1.0, got {total}")
+            raise ValueError(f"cost_weight and carbon_weight must sum to 1.0, got {total}")
         return self
 
 

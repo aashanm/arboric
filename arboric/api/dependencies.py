@@ -33,7 +33,7 @@ def get_autopilot(config: ArboricConfig = Depends(get_arboric_config)) -> Autopi
         Configured Autopilot instance
     """
     opt_config = OptimizationConfig(
-        price_weight=config.optimization.price_weight,
+        cost_weight=config.optimization.cost_weight,
         carbon_weight=config.optimization.carbon_weight,
         min_delay_hours=config.optimization.min_delay_hours,
         prefer_continuous=config.optimization.prefer_continuous,

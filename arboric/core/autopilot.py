@@ -25,7 +25,7 @@ from arboric.core.models import (
 
 # Optimization weights (configurable per deployment)
 # Cost-first strategy: prioritize dollar savings, use carbon as tie-breaker
-DEFAULT_PRICE_WEIGHT = 0.7
+DEFAULT_COST_WEIGHT = 0.7
 DEFAULT_CARBON_WEIGHT = 0.3
 
 
@@ -34,24 +34,24 @@ class OptimizationConfig:
 
     def __init__(
         self,
-        price_weight: float = DEFAULT_PRICE_WEIGHT,
+        cost_weight: float = DEFAULT_COST_WEIGHT,
         carbon_weight: float = DEFAULT_CARBON_WEIGHT,
         min_delay_hours: float = 0,
         prefer_continuous: bool = True,
     ):
         """
         Args:
-            price_weight: Weight for cost optimization (0-1)
+            cost_weight: Weight for cost optimization (0-1)
             carbon_weight: Weight for carbon optimization (0-1)
             min_delay_hours: Minimum delay before starting (e.g., for prep time)
             prefer_continuous: Prefer continuous windows over fragmented
         """
-        if not (0 <= price_weight <= 1 and 0 <= carbon_weight <= 1):
+        if not (0 <= cost_weight <= 1 and 0 <= carbon_weight <= 1):
             raise ValueError("Weights must be between 0 and 1")
-        if abs(price_weight + carbon_weight - 1.0) > 0.01:
+        if abs(cost_weight + carbon_weight - 1.0) > 0.01:
             raise ValueError("Weights must sum to 1.0")
 
-        self.price_weight = price_weight
+        self.cost_weight = cost_weight
         self.carbon_weight = carbon_weight
         self.min_delay_hours = min_delay_hours
         self.prefer_continuous = prefer_continuous
@@ -115,7 +115,7 @@ class Autopilot:
 
         # Weighted composite score (lower is better)
         composite = (
-            price_normalized * self.config.price_weight
+            price_normalized * self.config.cost_weight
             + carbon_normalized * self.config.carbon_weight
         )
 
@@ -594,12 +594,12 @@ class Autopilot:
 
 
 def create_autopilot(
-    price_weight: float = DEFAULT_PRICE_WEIGHT,
+    cost_weight: float = DEFAULT_COST_WEIGHT,
     carbon_weight: float = DEFAULT_CARBON_WEIGHT,
 ) -> Autopilot:
     """Factory function to create an Autopilot instance."""
     config = OptimizationConfig(
-        price_weight=price_weight,
+        cost_weight=cost_weight,
         carbon_weight=carbon_weight,
     )
     return Autopilot(config=config)

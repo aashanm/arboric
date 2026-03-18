@@ -63,7 +63,7 @@ def test_optimize_with_custom_config(client):
             "deadline_hours": 12.0,
         },
         "region": "US-EAST",
-        "optimization_config": {"price_weight": 0.8, "carbon_weight": 0.2},
+        "optimization_config": {"cost_weight": 0.8, "carbon_weight": 0.2},
     }
 
     response = client.post("/api/v1/optimize", json=payload)
@@ -114,7 +114,7 @@ def test_optimize_with_invalid_optimization_config(client):
             "deadline_hours": 12.0,
         },
         "optimization_config": {
-            "price_weight": 0.5,
+            "cost_weight": 0.5,
             "carbon_weight": 0.3,  # Sum != 1.0
         },
     }

@@ -32,16 +32,16 @@ async def get_status(config: ArboricConfig = Depends(get_arboric_config)):
     uptime_seconds = (datetime.now() - _server_start_time).total_seconds()
 
     # Determine grid mode and data sources
-    api_config = config.api
-    grid_mode = "live" if api_config.live_mode_enabled else "simulation"
+    live_data_config = config.live_data
+    grid_mode = "live" if live_data_config.enabled else "simulation"
     data_sources = []
 
-    if api_config.live_api_enabled and api_config.live_api_username:
+    if live_data_config.enabled and live_data_config.api_key:
         data_sources.append("live-data")
     if not data_sources:
         data_sources.append("mockgrid")
 
-    grid_type = "LiveGrid" if api_config.live_mode_enabled else "MockGrid"
+    grid_type = "LiveGrid" if live_data_config.enabled else "MockGrid"
 
     data = {
         "service": {
@@ -61,7 +61,7 @@ async def get_status(config: ArboricConfig = Depends(get_arboric_config)):
             "supported_regions": ["US-WEST", "US-EAST", "EU-WEST", "NORDIC"],
         },
         "configuration": {
-            "default_price_weight": config.optimization.price_weight,
+            "default_cost_weight": config.optimization.cost_weight,
             "default_carbon_weight": config.optimization.carbon_weight,
             "default_region": config.defaults.region,
         },

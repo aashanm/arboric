@@ -200,6 +200,7 @@ cython_debug/
 
 # Claude
 .claude/
+CLAUDE.md
 
 # Marimo
 marimo/_static/

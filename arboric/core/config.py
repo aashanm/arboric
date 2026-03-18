@@ -14,7 +14,7 @@ from pydantic import BaseModel, Field, field_validator
 class OptimizationSettings(BaseModel):
     """Optimization algorithm settings."""
 
-    price_weight: float = Field(
+    cost_weight: float = Field(
         default=0.7, ge=0.0, le=1.0, description="Weight for cost optimization (0-1)"
     )
     carbon_weight: float = Field(
@@ -25,17 +25,17 @@ class OptimizationSettings(BaseModel):
     )
     prefer_continuous: bool = Field(default=True, description="Prefer continuous execution windows")
 
-    @field_validator("price_weight", "carbon_weight")
+    @field_validator("cost_weight", "carbon_weight")
     @classmethod
     def validate_weights(cls, v, info):
         """Ensure weights sum to 1.0."""
         if info.field_name == "carbon_weight":
             # Only validate when both fields are present
             data = info.data
-            if "price_weight" in data:
-                price_weight = data["price_weight"]
-                if abs(price_weight + v - 1.0) > 0.01:
-                    raise ValueError("price_weight and carbon_weight must sum to 1.0")
+            if "cost_weight" in data:
+                cost_weight = data["cost_weight"]
+                if abs(cost_weight + v - 1.0) > 0.01:
+                    raise ValueError("cost_weight and carbon_weight must sum to 1.0")
         return v
 
 
@@ -48,17 +48,13 @@ class DefaultWorkloadSettings(BaseModel):
     region: str = Field(default="US-WEST", description="Default grid region")
 
 
-class APISettings(BaseModel):
-    """Settings for external API integrations."""
+class LiveDataSettings(BaseModel):
+    """Settings for live grid data integration."""
 
-    live_api_username: str | None = Field(default=None, description="Live data API username")
-    live_api_password: str | None = Field(default=None, description="Live data API password")
-    live_api_enabled: bool = Field(default=False, description="Enable live data integration")
-
-    @property
-    def live_mode_enabled(self) -> bool:
-        """Check if live data sources are configured and enabled."""
-        return self.live_api_enabled and bool(self.live_api_username)
+    enabled: bool = Field(default=False, description="Enable live grid data")
+    provider: str | None = Field(default=None, description="Data provider (e.g., 'watttime')")
+    api_key: str | None = Field(default=None, description="API key for live data provider")
+    api_secret: str | None = Field(default=None, description="API secret for live data provider")
 
 
 class CLISettings(BaseModel):
@@ -79,7 +75,7 @@ class ArboricConfig(BaseModel):
 
     optimization: OptimizationSettings = Field(default_factory=OptimizationSettings)
     defaults: DefaultWorkloadSettings = Field(default_factory=DefaultWorkloadSettings)
-    api: APISettings = Field(default_factory=APISettings)
+    live_data: LiveDataSettings = Field(default_factory=LiveDataSettings)
     cli: CLISettings = Field(default_factory=CLISettings)
 
     @classmethod

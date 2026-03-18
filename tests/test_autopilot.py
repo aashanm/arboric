@@ -20,26 +20,26 @@ class TestOptimizationConfig:
     def test_default_config(self):
         """Test default configuration values."""
         config = OptimizationConfig()
-        assert config.price_weight == 0.7
+        assert config.cost_weight == 0.7
         assert config.carbon_weight == 0.3
         assert config.min_delay_hours == 0
         assert config.prefer_continuous is True
 
     def test_custom_weights(self):
         """Test custom weight configuration."""
-        config = OptimizationConfig(price_weight=0.5, carbon_weight=0.5)
-        assert config.price_weight == 0.5
+        config = OptimizationConfig(cost_weight=0.5, carbon_weight=0.5)
+        assert config.cost_weight == 0.5
         assert config.carbon_weight == 0.5
 
     def test_weights_must_sum_to_one(self):
         """Test that weights must sum to 1.0."""
         with pytest.raises(ValueError, match="must sum to 1.0"):
-            OptimizationConfig(price_weight=0.6, carbon_weight=0.5)
+            OptimizationConfig(cost_weight=0.6, carbon_weight=0.5)
 
     def test_weights_must_be_in_range(self):
         """Test that weights must be between 0 and 1."""
         with pytest.raises(ValueError, match="must be between 0 and 1"):
-            OptimizationConfig(price_weight=1.5, carbon_weight=-0.5)
+            OptimizationConfig(cost_weight=1.5, carbon_weight=-0.5)
 
 
 class TestAutopilot:
@@ -79,14 +79,14 @@ class TestAutopilot:
         """Test basic autopilot initialization."""
         autopilot = Autopilot()
         assert autopilot.config is not None
-        assert autopilot.config.price_weight == 0.7
+        assert autopilot.config.cost_weight == 0.7
         assert autopilot.config.carbon_weight == 0.3
 
     def test_autopilot_with_custom_config(self):
         """Test autopilot with custom configuration."""
-        config = OptimizationConfig(price_weight=0.5, carbon_weight=0.5)
+        config = OptimizationConfig(cost_weight=0.5, carbon_weight=0.5)
         autopilot = Autopilot(config=config)
-        assert autopilot.config.price_weight == 0.5
+        assert autopilot.config.cost_weight == 0.5
 
     def test_optimize_schedule_returns_result(self, simple_workload, simple_forecast):
         """Test that optimize_schedule returns a valid ScheduleResult."""
@@ -154,7 +154,7 @@ class TestAutopilot:
         )
 
         # Use carbon-focused optimization
-        config = OptimizationConfig(price_weight=0.2, carbon_weight=0.8)
+        config = OptimizationConfig(cost_weight=0.2, carbon_weight=0.8)
         autopilot = Autopilot(config=config)
         result = autopilot.optimize_schedule(workload, forecast)
 
