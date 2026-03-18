@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "arboric"
-version = "0.1.0"
+version = "0.1.1"
 description = "Intelligent autopilot for cloud infrastructure - harvest optimal energy windows"
 readme = "README.md"
 license = {text = "MIT"}
@@ -67,7 +67,7 @@ dev = [
 arboric = "arboric.cli.main:main"
 
 [project.urls]
-Homepage = "https://github.com/aashanm/arboric"
+Homepage = "https://arboric.xyz"
 Documentation = "https://docs.arboric.dev"
 Repository = "https://github.com/aashanm/arboric"
 
