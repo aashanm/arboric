@@ -70,7 +70,7 @@ def test_config_endpoint(client):
     config_data = data["data"]
     assert "optimization" in config_data
     assert "defaults" in config_data
-    assert "api" in config_data
+    assert "live_data" in config_data
 
     # Check optimization config
     optimization = config_data["optimization"]
