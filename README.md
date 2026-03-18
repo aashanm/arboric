@@ -9,9 +9,9 @@
 
 ## The Problem
 
-AI teams spend millions on compute. Most of that cost is arbitrary—determined by *when* jobs run, not *what* they do. Peak pricing is 10-15x cheaper during solar hours, and grid carbon varies by 5x hour-to-hour. Yet nearly every workload runs immediately.
+AI teams spend millions on compute. Most of that cost is arbitrary - determined by *when* jobs run, not *what* they do. Peak pricing is 10-15x cheaper during solar hours, and grid carbon varies by 5x hour-to-hour. Yet nearly every workload runs immediately.
 
-Compliance is moving faster. SB 253 (California's Scope 3 deadline) is **January 2027**. Most cloud platforms can't prove workload carbon - they need your scheduling intelligence.
+Compliance is moving faster. SB 253 (California's Scope 3 deadline) is **January 2027**. Most cloud platforms can't prove workload carbon - they need scheduling intelligence.
 
 ## The Solution
 
