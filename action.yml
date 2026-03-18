@@ -106,8 +106,9 @@ runs:
 
     - name: Parse outputs
       id: parse
-      shell: python3
+      shell: bash
       run: |
+        python3 << 'PYEOF'
         import json
         import os
         result = json.load(open(os.path.join(os.environ['RUNNER_TEMP'], 'arboric.json')))
@@ -118,11 +119,13 @@ runs:
         out.write(f"cost_savings_percent={round(d['metrics']['savings']['cost_percent'], 1)}\n")
         out.write(f"carbon_savings_kg={round(d['metrics']['savings']['carbon_kg'], 3)}\n")
         out.close()
+        PYEOF
 
     - name: Post PR comment
       if: ${{ inputs.comment-on-pr == 'true' && github.event_name == 'pull_request' }}
-      shell: python3
+      shell: bash
       run: |
+        python3 << 'PYEOF'
         import json
         import os
         import urllib.request
@@ -160,5 +163,6 @@ runs:
                 print("✓ Posted PR comment")
         except:
             print("⚠ Could not post PR comment")
+        PYEOF
       env:
         GH_TOKEN: ${{ inputs.github-token }}
