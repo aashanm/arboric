@@ -963,8 +963,8 @@ def status():
     )
     # Determine data sources
     data_sources = []
-    api_config = config.api
-    if api_config.live_api_enabled and api_config.live_api_username:
+    live_data_config = config.live_data
+    if live_data_config.enabled and live_data_config.api_key:
         data_sources.append("Live Data")
     if not data_sources:
         data_sources.append("MockGrid")

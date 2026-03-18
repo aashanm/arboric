@@ -367,15 +367,15 @@ def get_grid(region: str = "US-WEST", config=None) -> MockGrid:  # type: ignore
 
         config = get_config()
 
-    api = config.api
+    live_data = config.live_data
 
     # Only attempt LiveGrid if live mode is enabled and arboric-cloud is available
-    if api.live_api_enabled and api.live_api_username and api.live_api_password:
+    if live_data.enabled and live_data.api_key and live_data.api_secret:
         try:
             # Try to import from the optional arboric-cloud package
             from arboric_cloud import create_live_grid
 
-            return create_live_grid(api.live_api_username, api.live_api_password, region)
+            return create_live_grid(live_data.api_key, live_data.api_secret, region)
         except ImportError:
             # arboric-cloud not installed, fall back to MockGrid
             import logging
