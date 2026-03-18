@@ -37,16 +37,12 @@ defaults:
 
 # External API integration settings
 api:
-  # WattTime API credentials (for real-time carbon intensity data)
+  # Live data source credentials (for real-time grid data)
   # Leave empty to use MockGrid simulation
-  watttime_username: null
-  watttime_password: null
-  watttime_enabled: false
-
-  # Electricity Maps API key (for real-time carbon and price data)
-  # Get your free API key at https://api.electricitymap.org
-  electricity_maps_api_key: null
-  electricity_maps_enabled: false
+  # For live data integrations, install: pip install arboric[cloud]
+  live_api_username: null
+  live_api_password: null
+  live_api_enabled: false
 
 # CLI display and behavior settings
 cli:

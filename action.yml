@@ -32,18 +32,13 @@ inputs:
     required: false
     default: 'US-WEST'
 
-  watttime-username:
-    description: '[Optional] WattTime API username'
+  live-api-username:
+    description: '[Optional] Live data API username'
     required: false
     default: ''
 
-  watttime-password:
-    description: '[Optional] WattTime API password'
-    required: false
-    default: ''
-
-  electricity-maps-key:
-    description: '[Optional] Electricity Maps API key'
+  live-api-password:
+    description: '[Optional] Live data API password'
     required: false
     default: ''
 
@@ -84,16 +79,14 @@ runs:
 
     - name: Setup live data config
       shell: bash
-      if: ${{ inputs.watttime-username != '' || inputs.electricity-maps-key != '' }}
+      if: ${{ inputs.live-api-username != '' }}
       run: |
         mkdir -p ~/.arboric
         cat > ~/.arboric/config.yaml << 'CONFIGEOF'
         api:
-          watttime_username: ${{ inputs.watttime-username }}
-          watttime_password: ${{ inputs.watttime-password }}
-          watttime_enabled: ${{ inputs.watttime-username != '' && 'true' || 'false' }}
-          electricity_maps_api_key: ${{ inputs.electricity-maps-key }}
-          electricity_maps_enabled: ${{ inputs.electricity-maps-key != '' && 'true' || 'false' }}
+          live_api_username: ${{ inputs.live-api-username }}
+          live_api_password: ${{ inputs.live-api-password }}
+          live_api_enabled: true
         CONFIGEOF
 
     - name: Run optimization

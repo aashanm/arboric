@@ -51,17 +51,14 @@ class DefaultWorkloadSettings(BaseModel):
 class APISettings(BaseModel):
     """Settings for external API integrations."""
 
-    watttime_username: str | None = Field(default=None, description="WattTime API username")
-    watttime_password: str | None = Field(default=None, description="WattTime API password")
-    watttime_enabled: bool = Field(default=False, description="Enable WattTime integration")
-    electricity_maps_api_key: str | None = Field(default=None, description="Electricity Maps API key")
-    electricity_maps_enabled: bool = Field(default=False, description="Enable Electricity Maps integration")
+    live_api_username: str | None = Field(default=None, description="Live data API username")
+    live_api_password: str | None = Field(default=None, description="Live data API password")
+    live_api_enabled: bool = Field(default=False, description="Enable live data integration")
 
     @property
     def live_mode_enabled(self) -> bool:
-        """Check if any live data source is configured and enabled."""
-        return (self.watttime_enabled and bool(self.watttime_username)) or \
-               (self.electricity_maps_enabled and bool(self.electricity_maps_api_key))
+        """Check if live data sources are configured and enabled."""
+        return self.live_api_enabled and bool(self.live_api_username)
 
 
 class CLISettings(BaseModel):

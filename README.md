@@ -259,9 +259,6 @@ arboric/
 │   │   ├── models.py            # Pydantic data models
 │   │   ├── autopilot.py         # Optimization algorithm
 │   │   └── grid_oracle.py       # Grid forecast simulation
-│   └── integrations/
-│       ├── __init__.py
-│       └── watttime.py          # Future: Real API integration
 ├── tests/
 │   ├── test_models.py
 │   ├── test_autopilot.py
@@ -286,7 +283,7 @@ arboric/
 **Grid Oracle** ([grid_oracle.py](arboric/core/grid_oracle.py))
 - Simulates realistic grid behavior with duck curve dynamics
 - Regional profiles for US-WEST, US-EAST, EU-WEST, NORDIC
-- Future: Integration with WattTime API, ISO market data
+- Optional: Integration with live grid data sources (install `arboric[cloud]`)
 
 ---
 
@@ -368,10 +365,11 @@ See [config.example.yaml](config.example.yaml) for a complete example with docum
 - `quiet_mode`: Minimize output (default: false)
 - `auto_approve`: Skip confirmation prompts (default: false)
 
-**API Settings:**
-- `watttime_username`: WattTime API username
-- `watttime_password`: WattTime API password
-- `watttime_enabled`: Enable WattTime integration (default: false)
+**API Settings (for live data sources):**
+- `live_api_username`: Live data API username
+- `live_api_password`: Live data API password
+- `live_api_enabled`: Enable live data integration (default: false)
+- *For live data support, install: `pip install arboric[cloud]`*
 
 ### Example Configuration
 
@@ -440,7 +438,7 @@ Arboric is released under the [MIT License](LICENSE).
 
 ## 🙏 Acknowledgments
 
-- Regional grid profiles based on CAISO, ERCOT, and EIA data
+- Regional grid profiles based on real-world electricity market characteristics
 
 ---
 

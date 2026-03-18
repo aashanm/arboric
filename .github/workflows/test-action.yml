@@ -39,6 +39,8 @@ jobs:
           power-kw: '120'
           deadline: '24'
           region: 'US-WEST'
+          live-api-username: ${{ secrets.LIVE_API_USERNAME || '' }}
+          live-api-password: ${{ secrets.LIVE_API_PASSWORD || '' }}
 
       - name: Verify outputs are valid
         run: |

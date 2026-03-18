@@ -36,10 +36,8 @@ async def get_status(config: ArboricConfig = Depends(get_arboric_config)):
     grid_mode = "live" if api_config.live_mode_enabled else "simulation"
     data_sources = []
 
-    if api_config.watttime_enabled and api_config.watttime_username:
-        data_sources.append("watttime")
-    if api_config.electricity_maps_enabled and api_config.electricity_maps_api_key:
-        data_sources.append("electricity_maps")
+    if api_config.live_api_enabled and api_config.live_api_username:
+        data_sources.append("live-data")
     if not data_sources:
         data_sources.append("mockgrid")
 

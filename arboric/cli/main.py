@@ -928,6 +928,14 @@ def status():
     print_banner()
     console.print()
 
+    # Determine actual grid type being used
+    from arboric.core.grid_oracle import get_grid, MockGrid
+    config = get_config()
+    grid = get_grid(region="US-WEST", config=config)
+    grid_type = type(grid).__name__
+    mode = "live" if isinstance(grid, type(grid)) and grid_type == "LiveGrid" else "simulation"
+    grid_details = f"{grid_type} ({mode} mode)"
+
     status_table = Table(
         title="[bold]System Status",
         box=box.ROUNDED,
@@ -940,7 +948,7 @@ def status():
     status_table.add_row(
         "Grid Oracle",
         f"[{ARBORIC_GREEN}]● ONLINE[/{ARBORIC_GREEN}]",
-        "MockGrid (simulation mode)",
+        grid_details,
     )
     status_table.add_row(
         "Autopilot Engine",
@@ -952,10 +960,21 @@ def status():
         f"[{ARBORIC_GREEN}]● 4 ACTIVE[/{ARBORIC_GREEN}]",
         "US-WEST, US-EAST, EU-WEST, NORDIC",
     )
+    # Determine data sources
+    data_sources = []
+    api_config = config.api
+    if api_config.live_api_enabled and api_config.live_api_username:
+        data_sources.append("Live Data")
+    if not data_sources:
+        data_sources.append("MockGrid")
+
+    data_source_text = " + ".join(data_sources)
+    api_status = f"[{ARBORIC_GREEN}]● {data_source_text}[/{ARBORIC_GREEN}]" if "Live Data" in data_source_text else f"[{ARBORIC_AMBER}]○ {data_source_text}[/{ARBORIC_AMBER}]"
+
     status_table.add_row(
         "API Integration",
-        f"[{ARBORIC_AMBER}]○ SIMULATED[/{ARBORIC_AMBER}]",
-        "Ready for WattTime/ISO APIs",
+        api_status,
+        "Live carbon data + simulated pricing" if "Live Data" in data_source_text else "Simulated grid data",
     )
 
     console.print(status_table)
@@ -1035,13 +1054,13 @@ def config(
             console.print()
 
             # API settings
-            if cfg.api.watttime_enabled:
+            if cfg.api.live_api_enabled:
                 console.print(
-                    f"[{ARBORIC_GREEN}]✓[/{ARBORIC_GREEN}] WattTime API integration enabled"
+                    f"[{ARBORIC_GREEN}]✓[/{ARBORIC_GREEN}] Live data integration enabled"
                 )
             else:
                 console.print(
-                    f"[{ARBORIC_AMBER}]○[/{ARBORIC_AMBER}] WattTime API integration disabled"
+                    f"[{ARBORIC_AMBER}]○[/{ARBORIC_AMBER}] Live data integration disabled"
                 )
             console.print()
 

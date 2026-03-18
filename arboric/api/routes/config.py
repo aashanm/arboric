@@ -38,7 +38,7 @@ async def get_config(config: ArboricConfig = Depends(get_arboric_config)):
             "deadline_hours": config.defaults.deadline_hours,
             "region": config.defaults.region,
         },
-        "api": {"watttime_enabled": config.api.watttime_enabled},
+        "api": {"live_api_enabled": config.api.live_api_enabled},
     }
 
     return create_api_response("config", data)
