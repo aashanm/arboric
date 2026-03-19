@@ -204,7 +204,8 @@ def create_forecast_chart(forecast_df, optimal_start, workload_duration) -> str:
     hour_labels = "  " + " " * 21
     for i in range(0, hours, 4):
         ts = forecast_df.index[i]
-        hour_labels += f"{ts.hour:02d}  "
+        local_hour = to_local_time(ts).hour
+        hour_labels += f"{local_hour:02d}  "
     lines.append(hour_labels + " (hour)")
 
     return "\n".join(lines)
@@ -309,7 +310,9 @@ def optimize(
 
     # Get forecast and optimize
     grid = get_grid(region=region, config=cfg)
-    forecast = grid.get_forecast(hours=int(deadline) + int(duration) + 2)
+    # Start forecast from current local time (rounded to current hour) for accurate delay calculation
+    now = datetime.now().replace(minute=0, second=0, microsecond=0)
+    forecast = grid.get_forecast(hours=int(deadline) + int(duration) + 2, start_time=now)
 
     # Create autopilot with config-based optimization settings
     opt_config = OptimizationConfig(
@@ -320,6 +323,11 @@ def optimize(
     )
     autopilot = Autopilot(config=opt_config)
     result = autopilot.optimize_schedule(workload, forecast)
+
+    # DEBUG: Print autopilot logs
+    if not quiet:
+        for log_entry in autopilot.get_log():
+            console.print(f"[dim]{log_entry}[/dim]")
 
     # Auto-record to history database
     if cfg.history.enabled:
@@ -532,7 +540,7 @@ def tradeoff(
 
         tradeoff_table.add_row(
             str(i),
-            point["start_time"].strftime("%H:%M"),
+            format_local_time(point["start_time"]),
             cost_display,
             f"{point['carbon']:.2f}",
             savings_display,
@@ -763,7 +771,7 @@ minimum cost and carbon emissions.
 
         results_table.add_row(
             r.workload.name[:27],
-            r.optimal_start.strftime("%H:%M"),
+            format_local_time(r.optimal_start),
             delay_str,
             cost_display,
             f"{r.carbon_savings_kg:.2f} kg",
@@ -951,7 +959,7 @@ def forecast(
         status = " ".join(status_parts) if status_parts else "─"
 
         table.add_row(
-            timestamp.strftime("%H:%M"),
+            format_local_time(timestamp),
             f"[{price_color}]${row['price']:.4f}[/{price_color}]",
             f"[{carbon_color}]{row['co2_intensity']:.0f} gCO₂[/{carbon_color}]",
             f"{row['renewable_percentage']:.0f}%",
@@ -976,10 +984,10 @@ def forecast(
 
     console.print()
     console.print(
-        f"[bold {ARBORIC_GREEN}]Best price window:[/bold {ARBORIC_GREEN}] {best_price_idx.strftime('%H:%M')} (${forecast_df.loc[best_price_idx, 'price']:.4f}/kWh)"
+        f"[bold {ARBORIC_GREEN}]Best price window:[/bold {ARBORIC_GREEN}] {format_local_time(best_price_idx)} (${forecast_df.loc[best_price_idx, 'price']:.4f}/kWh)"
     )
     console.print(
-        f"[bold {ARBORIC_GREEN}]Greenest window:[/bold {ARBORIC_GREEN}] {best_carbon_idx.strftime('%H:%M')} ({forecast_df.loc[best_carbon_idx, 'co2_intensity']:.0f} gCO₂/kWh)"
+        f"[bold {ARBORIC_GREEN}]Greenest window:[/bold {ARBORIC_GREEN}] {format_local_time(best_carbon_idx)} ({forecast_df.loc[best_carbon_idx, 'co2_intensity']:.0f} gCO₂/kWh)"
     )
 
 
