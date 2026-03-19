@@ -254,7 +254,9 @@ def optimize(
         None, "--output", "-o", help="Output file path (or '-' for stdout)"
     ),
     format: str | None = typer.Option(None, "--format", "-f", help="Export format: json, csv"),
-    receipt: str | None = typer.Option(None, "--receipt", help="Generate certified receipt PDF at path"),
+    receipt: str | None = typer.Option(
+        None, "--receipt", help="Generate certified receipt PDF at path"
+    ),
 ):
     """
     Optimize a single workload for cost and carbon efficiency.
@@ -382,7 +384,9 @@ def optimize(
 
             carbon_receipt, pdf_bytes = generate_receipt(result, forecast, cfg)
             Path(receipt).write_bytes(pdf_bytes)
-            console.print(f"[{ARBORIC_GREEN}]✓ Receipt saved:[/] {receipt}  (ID: {carbon_receipt.receipt_id})")
+            console.print(
+                f"[{ARBORIC_GREEN}]✓ Receipt saved:[/] {receipt}  (ID: {carbon_receipt.receipt_id})"
+            )
             console.print()
         except ImportError:
             console.print(
