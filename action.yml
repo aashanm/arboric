@@ -145,7 +145,7 @@ runs:
           "",
           timing,
           "",
-          "<sub>Powered by [Arboric](https://arboric.dev)</sub>",
+          "<sub>Powered by [Arboric](https://arboric.xyz)</sub>",
         ]
         body = "\n".join(lines)
         token = os.environ.get('GH_TOKEN', '')
