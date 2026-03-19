@@ -179,6 +179,59 @@ Works with any orchestration (Airflow DAGs, Kubernetes Jobs, Lambda, etc.).
 
 ---
 
+## 📊 Historical Analysis & Compliance
+
+### `arboric history` — Optimization Audit Trail
+Track all optimization decisions over time. Store in SQLite (scales to Postgres).
+
+```bash
+arboric history --since 30  # Last 30 days
+arboric history --region US-WEST --limit 50
+```
+
+Returns:
+- Which jobs were optimized and when
+- Actual grid prices + carbon used
+- Cost/carbon savings achieved
+- Optimization timestamp + region
+
+**Use case:** Show CFO proof of savings. Export monthly reports for stakeholder reviews.
+
+### `arboric insights` — ROI & Trends Analysis
+Aggregate historical optimizations to reveal savings patterns and opportunities.
+
+```bash
+arboric insights
+```
+
+Shows:
+- **Total savings YTD** — Cost + carbon across all jobs
+- **Best region** — Which grid region delivered highest savings
+- **Top workload** — Which job type saved most money
+- **Savings trajectory** — Trend over time (daily/weekly/monthly)
+- **Carbon avoided** — Total kg CO₂ displaced
+
+**Use case:** Board presentations. Prove optimization impact to finance/sustainability teams.
+
+### Certified Carbon Receipt (Enterprise)
+Generate tamper-evident PDF per job with cryptographic signature for compliance.
+
+```bash
+arboric optimize "Training Job" --receipt report.pdf
+```
+
+Includes:
+- **MOER data** — Real carbon intensity from WattTime
+- **Pricing snapshot** — Actual $/kWh paid or avoided
+- **Execution details** — Job start time, duration, power, region
+- **Savings proof** — Cost + carbon savings with supporting numbers
+- **Audit signature** — Cryptographic hash for tamper detection
+- **Compliance ready** — Audit trail for SB 253 Scope 3 reporting
+
+**Use case:** Provide compliance artifacts to CFO/legal. Prove carbon-aware scheduling to auditors. Required for enterprise deals.
+
+---
+
 ## 🏗️ How It Works
 
 Arboric doesn't predict the future or use ML. It uses real grid data (or realistic simulation) to find the cheapest, cleanest execution window within your deadline.
