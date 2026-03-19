@@ -6,6 +6,7 @@ for cost and carbon optimization. Built with Typer and Rich.
 """
 
 import time
+from datetime import datetime
 
 import typer
 from rich import box
@@ -25,12 +26,41 @@ from rich.text import Text
 
 from arboric.core.autopilot import Autopilot, OptimizationConfig
 from arboric.core.config import ArboricConfig, get_config
-from arboric.core.grid_oracle import MockGrid
+from arboric.core.grid_oracle import MockGrid, get_grid
 from arboric.core.history import HistoryStore
 from arboric.core.models import FleetOptimizationResult, Workload, WorkloadType
 
 # Initialize Rich console
 console = Console()
+
+
+def to_local_time(dt):
+    """Convert UTC datetime/timestamp to local timezone."""
+    from datetime import timezone as tz
+
+    import pandas as pd
+
+    # Handle pandas Timestamp
+    if isinstance(dt, pd.Timestamp):
+        # Convert to Python datetime, ensuring UTC
+        if dt.tz is None:
+            dt_py = dt.replace(tzinfo=tz.utc)
+        else:
+            dt_py = dt.to_pydatetime()
+        # Convert to local timezone
+        return dt_py.astimezone()
+
+    # Handle Python datetime
+    if dt.tzinfo is None:
+        # Assume UTC if no timezone info
+        dt = dt.replace(tzinfo=tz.utc)
+    return dt.astimezone()
+
+
+def format_local_time(dt, fmt: str = "%H:%M") -> str:
+    """Format datetime in local timezone."""
+    return to_local_time(dt).strftime(fmt)
+
 
 # Initialize Typer app
 app = typer.Typer(
@@ -86,8 +116,8 @@ def create_comparison_table(result) -> Table:
     # Start time
     table.add_row(
         "Start Time",
-        result.baseline_start.strftime("%H:%M"),
-        result.optimal_start.strftime("%H:%M"),
+        format_local_time(result.baseline_start),
+        format_local_time(result.optimal_start),
         f"+{result.delay_hours:.1f}h delay" if result.delay_hours > 0 else "Immediate",
     )
 
@@ -223,6 +253,7 @@ def optimize(
         None, "--output", "-o", help="Output file path (or '-' for stdout)"
     ),
     format: str | None = typer.Option(None, "--format", "-f", help="Export format: json, csv"),
+    receipt: str | None = typer.Option(None, "--receipt", help="Generate certified receipt PDF at path"),
 ):
     """
     Optimize a single workload for cost and carbon efficiency.
@@ -277,7 +308,7 @@ def optimize(
         console.print()
 
     # Get forecast and optimize
-    grid = MockGrid(region=region)
+    grid = get_grid(region=region, config=cfg)
     forecast = grid.get_forecast(hours=int(deadline) + int(duration) + 2)
 
     # Create autopilot with config-based optimization settings
@@ -334,6 +365,26 @@ def optimize(
             console.print(f"[{ARBORIC_RED}]Export failed: {e}[/{ARBORIC_RED}]")
             raise typer.Exit(1)
 
+    # Handle receipt generation if requested
+    if receipt:
+        try:
+            from pathlib import Path
+
+            from arboric.receipts import generate_receipt
+
+            carbon_receipt, pdf_bytes = generate_receipt(result, forecast, cfg)
+            Path(receipt).write_bytes(pdf_bytes)
+            console.print(f"[{ARBORIC_GREEN}]✓ Receipt saved:[/] {receipt}  (ID: {carbon_receipt.receipt_id})")
+            console.print()
+        except ImportError:
+            console.print(
+                f"[{ARBORIC_RED}]⚠ Enterprise deps not installed. Run: pip install arboric[enterprise][/{ARBORIC_RED}]"
+            )
+            raise typer.Exit(1)
+        except Exception as e:
+            console.print(f"[{ARBORIC_RED}]Receipt generation failed: {e}[/{ARBORIC_RED}]")
+            raise typer.Exit(1)
+
     # Display events
     events = grid.detect_events(forecast)
     if events and not quiet:
@@ -348,7 +399,7 @@ def optimize(
     if result.delay_hours > 0:
         console.print(
             f"[bold {ARBORIC_GREEN}]Rerouting payload to "
-            f"{result.optimal_start.strftime('%H:%M')} "
+            f"{format_local_time(result.optimal_start)} "
             f"({result.delay_hours:.1f}h delay)[/bold {ARBORIC_GREEN}]"
         )
     else:
@@ -441,7 +492,7 @@ def tradeoff(
         simulate_optimization_animation(workload_name, duration=1.0)
         console.print()
 
-    grid = MockGrid(region=region)
+    grid = get_grid(region=region, config=cfg)
     forecast = grid.get_forecast(hours=int(deadline) + int(duration) + 2)
 
     opt_config = OptimizationConfig(
@@ -605,7 +656,6 @@ minimum cost and carbon emissions.
 
     # Initialize grid and autopilot
     # Start forecast at evening peak (18:00) to show optimizer finding cheaper morning windows
-    from datetime import datetime
 
     demo_start = datetime.now().replace(hour=18, minute=0, second=0, microsecond=0)
 
@@ -826,7 +876,9 @@ def forecast(
     console.print(f"[bold]Fetching {hours}h forecast for {region}...[/bold]")
     console.print()
 
-    grid = MockGrid(region=region)
+    cfg = get_config()
+    grid = get_grid(region=region, config=cfg)
+    # Get forecast without explicit start_time, letting grid_oracle handle rounding UP
     forecast_df = grid.get_forecast(hours=hours)
 
     # Handle export if requested
