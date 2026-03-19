@@ -42,11 +42,8 @@ def to_local_time(dt):
 
     # Handle pandas Timestamp
     if isinstance(dt, pd.Timestamp):
-        # Convert to Python datetime, ensuring UTC
-        if dt.tz is None:
-            dt_py = dt.replace(tzinfo=tz.utc)
-        else:
-            dt_py = dt.to_pydatetime()
+        # Always convert pandas Timestamp to Python datetime first
+        dt_py = dt.to_pydatetime() if dt.tz else dt.replace(tzinfo=tz.utc).to_pydatetime()
         # Convert to local timezone
         return dt_py.astimezone()
 
@@ -335,9 +332,14 @@ def optimize(
     if cfg.history.enabled:
         from pathlib import Path
 
-        store = HistoryStore(Path(cfg.history.db_path).expanduser())
-        data_source = "live" if type(grid).__name__ == "LiveGrid" else "mockgrid"
-        store.record(result, region=region, data_source=data_source)
+        try:
+            store = HistoryStore(Path(cfg.history.db_path).expanduser())
+            data_source = "live" if type(grid).__name__ == "LiveGrid" else "mockgrid"
+            store.record(result, region=region, data_source=data_source)
+        except Exception as e:
+            # Gracefully handle history db failures (e.g., in CI/GitHub Actions)
+            if not quiet:
+                console.print(f"[dim]Note: Could not record to history database: {e}[/dim]")
 
     # Handle export if requested
     if output:
