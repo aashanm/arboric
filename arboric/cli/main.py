@@ -35,23 +35,32 @@ console = Console()
 
 
 def to_local_time(dt):
-    """Convert UTC datetime/timestamp to local timezone."""
+    """Convert datetime to local timezone (if needed). Naive timestamps are assumed to already be in local time."""
     from datetime import timezone as tz
 
     import pandas as pd
 
     # Handle pandas Timestamp
     if isinstance(dt, pd.Timestamp):
-        # Always convert pandas Timestamp to Python datetime first
-        dt_py = dt.to_pydatetime() if dt.tz else dt.replace(tzinfo=tz.utc).to_pydatetime()
-        # Convert to local timezone
-        return dt_py.astimezone()
+        dt_py = dt.to_pydatetime()
+        # If naive (from our forecast), it's already in local time - return as-is
+        if dt_py.tzinfo is None:
+            return dt_py
+        # If UTC-aware, convert to local
+        if str(dt_py.tzinfo) == "UTC":
+            return dt_py.astimezone()
+        # If already in a local timezone, return as-is
+        return dt_py
 
     # Handle Python datetime
     if dt.tzinfo is None:
-        # Assume UTC if no timezone info
-        dt = dt.replace(tzinfo=tz.utc)
-    return dt.astimezone()
+        # Naive timestamps from forecast are already in local time
+        return dt
+    if str(dt.tzinfo) == "UTC":
+        # UTC-aware, convert to local
+        return dt.astimezone()
+    # Already in some timezone, return as-is
+    return dt
 
 
 def format_local_time(dt, fmt: str = "%H:%M") -> str:
@@ -309,9 +318,11 @@ def optimize(
 
     # Get forecast and optimize
     grid = get_grid(region=region, config=cfg)
-    # Start forecast from current local time (rounded to current hour) for accurate delay calculation
-    now = datetime.now().replace(minute=0, second=0, microsecond=0)
-    forecast = grid.get_forecast(hours=int(deadline) + int(duration) + 2, start_time=now)
+    # Convert local time to UTC for forecast (both MockGrid and LiveGrid expect UTC internally)
+    from datetime import timezone as tz
+    now_local = datetime.now().replace(minute=0, second=0, microsecond=0)
+    now_utc = now_local.astimezone(tz.utc).replace(tzinfo=None)
+    forecast = grid.get_forecast(hours=int(deadline) + int(duration) + 2, start_time=now_utc)
 
     # Create autopilot with config-based optimization settings
     opt_config = OptimizationConfig(
@@ -1026,15 +1037,25 @@ def status():
         f"[{ARBORIC_GREEN}]● ONLINE[/{ARBORIC_GREEN}]",
         grid_details,
     )
+    # Format optimization weights as percentages
+    cost_pct = int(config.optimization.cost_weight * 100)
+    carbon_pct = int(config.optimization.carbon_weight * 100)
+
     status_table.add_row(
         "Autopilot Engine",
         f"[{ARBORIC_GREEN}]● READY[/{ARBORIC_GREEN}]",
-        "v1.0.0 | 60/40 cost/carbon weights",
+        f"v1.0.0 | {cost_pct}/{carbon_pct} cost/carbon weights",
     )
+
+    # Get supported regions from grid oracle
+    from arboric.core.grid_oracle import REGION_PROFILES
+    regions = ", ".join(sorted(REGION_PROFILES.keys()))
+    region_count = len(REGION_PROFILES)
+
     status_table.add_row(
         "Supported Regions",
-        f"[{ARBORIC_GREEN}]● 4 ACTIVE[/{ARBORIC_GREEN}]",
-        "US-WEST, US-EAST, EU-WEST, NORDIC",
+        f"[{ARBORIC_GREEN}]● {region_count} ACTIVE[/{ARBORIC_GREEN}]",
+        regions,
     )
     # Determine data sources
     data_sources = []
@@ -1051,12 +1072,17 @@ def status():
         else f"[{ARBORIC_AMBER}]○ {data_source_text}[/{ARBORIC_AMBER}]"
     )
 
+    # Determine data source details
+    if "Live Data" in data_source_text:
+        provider = config.live_data.provider or "external provider"
+        data_details = f"Live carbon ({provider}) + pricing"
+    else:
+        data_details = "Simulated grid data"
+
     status_table.add_row(
         "API Integration",
         api_status,
-        "Live carbon data + simulated pricing"
-        if "Live Data" in data_source_text
-        else "Simulated grid data",
+        data_details,
     )
 
     console.print(status_table)
