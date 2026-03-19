@@ -7,6 +7,8 @@ from pathlib import Path
 from arboric.receipts.exceptions import EnterpriseFeatureNotAvailableError, SigningError
 from arboric.receipts.models import CarbonReceipt, CryptoSignature
 
+# Try to import cryptography, but don't fail at module load time
+_CRYPTOGRAPHY_AVAILABLE = False
 try:
     from cryptography.hazmat.backends import default_backend
     from cryptography.hazmat.primitives import hashes, serialization
@@ -15,10 +17,18 @@ try:
         load_pem_private_key,
         load_pem_public_key,
     )
-except ImportError as e:
-    raise EnterpriseFeatureNotAvailableError(
-        "cryptography not found. Install: pip install arboric[enterprise]"
-    ) from e
+
+    _CRYPTOGRAPHY_AVAILABLE = True
+except ImportError:
+    pass
+
+
+def _check_cryptography():
+    """Raise error if cryptography is not available."""
+    if not _CRYPTOGRAPHY_AVAILABLE:
+        raise EnterpriseFeatureNotAvailableError(
+            "cryptography not found. Install: pip install arboric[enterprise]"
+        )
 
 
 def generate_keypair() -> tuple[bytes, bytes]:
@@ -28,6 +38,7 @@ def generate_keypair() -> tuple[bytes, bytes]:
     Returns:
         Tuple of (private_pem, public_pem) as bytes.
     """
+    _check_cryptography()
     private_key = ec.generate_private_key(ec.SECP256R1(), default_backend())
     public_key = private_key.public_key()
 
@@ -52,6 +63,7 @@ def load_or_create_keypair() -> tuple:
     Returns:
         Tuple of (private_key, public_key) cryptography objects.
     """
+    _check_cryptography()
     key_dir = Path.home() / ".arboric" / "keys"
     key_dir.mkdir(parents=True, exist_ok=True)
 
@@ -105,6 +117,7 @@ def sign_receipt(receipt: CarbonReceipt) -> CryptoSignature:
     Raises:
         SigningError: If signing fails.
     """
+    _check_cryptography()
     try:
         canonical = receipt.canonical_json()
         data_hash = hashlib.sha256(canonical.encode()).hexdigest()

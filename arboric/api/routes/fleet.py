@@ -2,6 +2,9 @@
 Fleet optimization endpoint.
 """
 
+from datetime import datetime
+from datetime import timezone as tz
+
 from fastapi import APIRouter, Depends, HTTPException, status
 
 from arboric.api.dependencies import get_autopilot
@@ -40,7 +43,13 @@ async def optimize_fleet(
         # Get grid forecast
         grid = get_grid(region=request.region, config=get_config())
         forecast_hours = request.forecast_hours or 48
-        forecast = grid.get_forecast(hours=forecast_hours)
+        # Pass appropriate time based on grid type
+        now_local = datetime.now().replace(minute=0, second=0, microsecond=0)
+        if type(grid).__name__ == "LiveGrid":
+            now_for_forecast = now_local.astimezone(tz.utc).replace(tzinfo=None)
+        else:
+            now_for_forecast = now_local
+        forecast = grid.get_forecast(hours=forecast_hours, start_time=now_for_forecast)
 
         # Run fleet optimization
         result = autopilot.optimize_fleet(request.workloads, forecast)

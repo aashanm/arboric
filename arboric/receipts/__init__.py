@@ -10,8 +10,23 @@ from arboric.receipts.models import (
     CryptoSignature,
     HourlyMOEREntry,
 )
-from arboric.receipts.service import generate_receipt
-from arboric.receipts.signing import verify_receipt
+
+# Lazy import enterprise features - only raise error if actually used
+try:
+    from arboric.receipts.service import generate_receipt
+    from arboric.receipts.signing import verify_receipt
+except EnterpriseFeatureNotAvailableError:
+    # Enterprise dependencies not available - export placeholder
+    def generate_receipt(*args, **kwargs):  # type: ignore
+        raise EnterpriseFeatureNotAvailableError(
+            "Enterprise features not available. Install: pip install arboric[enterprise]"
+        )
+
+    def verify_receipt(*args, **kwargs):  # type: ignore
+        raise EnterpriseFeatureNotAvailableError(
+            "Enterprise features not available. Install: pip install arboric[enterprise]"
+        )
+
 
 __all__ = [
     "generate_receipt",

@@ -36,7 +36,6 @@ console = Console()
 
 def to_local_time(dt):
     """Convert datetime to local timezone (if needed). Naive timestamps are assumed to already be in local time."""
-    from datetime import timezone as tz
 
     import pandas as pd
 
@@ -318,11 +317,21 @@ def optimize(
 
     # Get forecast and optimize
     grid = get_grid(region=region, config=cfg)
-    # Convert local time to UTC for forecast (both MockGrid and LiveGrid expect UTC internally)
+    # Pass appropriate time based on grid type:
+    # - MockGrid expects naive local time for correct hour_of_day calculations
+    # - LiveGrid expects UTC time (interprets naive datetime as UTC)
     from datetime import timezone as tz
+
     now_local = datetime.now().replace(minute=0, second=0, microsecond=0)
-    now_utc = now_local.astimezone(tz.utc).replace(tzinfo=None)
-    forecast = grid.get_forecast(hours=int(deadline) + int(duration) + 2, start_time=now_utc)
+    if type(grid).__name__ == "LiveGrid":
+        # LiveGrid interprets naive datetime as UTC
+        now_for_forecast = now_local.astimezone(tz.utc).replace(tzinfo=None)
+    else:
+        # MockGrid expects naive local time
+        now_for_forecast = now_local
+    forecast = grid.get_forecast(
+        hours=int(deadline) + int(duration) + 2, start_time=now_for_forecast
+    )
 
     # Create autopilot with config-based optimization settings
     opt_config = OptimizationConfig(
@@ -518,7 +527,19 @@ def tradeoff(
         console.print()
 
     grid = get_grid(region=region, config=cfg)
-    forecast = grid.get_forecast(hours=int(deadline) + int(duration) + 2)
+    # Pass appropriate time based on grid type:
+    # - MockGrid expects naive local time for correct hour_of_day calculations
+    # - LiveGrid expects UTC time (interprets naive datetime as UTC)
+    from datetime import timezone as tz
+
+    now_local = datetime.now().replace(minute=0, second=0, microsecond=0)
+    if type(grid).__name__ == "LiveGrid":
+        now_for_forecast = now_local.astimezone(tz.utc).replace(tzinfo=None)
+    else:
+        now_for_forecast = now_local
+    forecast = grid.get_forecast(
+        hours=int(deadline) + int(duration) + 2, start_time=now_for_forecast
+    )
 
     opt_config = OptimizationConfig(
         cost_weight=cfg.optimization.cost_weight,
@@ -903,8 +924,17 @@ def forecast(
 
     cfg = get_config()
     grid = get_grid(region=region, config=cfg)
-    # Get forecast without explicit start_time, letting grid_oracle handle rounding UP
-    forecast_df = grid.get_forecast(hours=hours)
+    # Pass appropriate time based on grid type:
+    # - MockGrid expects naive local time for correct hour_of_day calculations
+    # - LiveGrid expects UTC time (interprets naive datetime as UTC)
+    from datetime import timezone as tz
+
+    now_local = datetime.now().replace(minute=0, second=0, microsecond=0)
+    if type(grid).__name__ == "LiveGrid":
+        now_for_forecast = now_local.astimezone(tz.utc).replace(tzinfo=None)
+    else:
+        now_for_forecast = now_local
+    forecast_df = grid.get_forecast(hours=hours, start_time=now_for_forecast)
 
     # Handle export if requested
     if output:
@@ -1049,6 +1079,7 @@ def status():
 
     # Get supported regions from grid oracle
     from arboric.core.grid_oracle import REGION_PROFILES
+
     regions = ", ".join(sorted(REGION_PROFILES.keys()))
     region_count = len(REGION_PROFILES)
 
@@ -1074,8 +1105,7 @@ def status():
 
     # Determine data source details
     if "Live Data" in data_source_text:
-        provider = config.live_data.provider or "external provider"
-        data_details = f"Live carbon ({provider}) + pricing"
+        data_details = "Live carbon + pricing"
     else:
         data_details = "Simulated grid data"
 

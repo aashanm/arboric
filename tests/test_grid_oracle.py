@@ -110,11 +110,13 @@ class TestMockGrid:
     def test_solar_duck_curve_pattern(self):
         """Test that forecast exhibits solar duck curve (low midday carbon)."""
         grid = MockGrid(region="US-WEST", seed=42)
-        forecast = grid.get_forecast(hours=24)
+        # Start forecast at midnight for predictable hour indices
+        from datetime import datetime
+
+        start_time = datetime(2026, 3, 19, 0, 0, 0)
+        forecast = grid.get_forecast(hours=24, start_time=start_time)
 
         # Find midday hours (11am-3pm, hours 11-14)
-        # Note: this depends on when the test runs, so we use relative comparison
-        # The pattern should show lower carbon during solar hours
         morning_carbon = forecast.iloc[8:11]["co2_intensity"].mean()  # 8-10am
         midday_carbon = forecast.iloc[11:15]["co2_intensity"].mean()  # 11am-2pm
         evening_carbon = forecast.iloc[17:20]["co2_intensity"].mean()  # 5-7pm

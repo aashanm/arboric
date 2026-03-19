@@ -4,10 +4,29 @@ import pandas as pd
 
 from arboric.core.config import ArboricConfig
 from arboric.core.models import ScheduleResult
-from arboric.receipts.exceptions import PDFGenerationError
+from arboric.receipts.exceptions import EnterpriseFeatureNotAvailableError, PDFGenerationError
 from arboric.receipts.models import CarbonReceipt, HourlyMOEREntry
-from arboric.receipts.pdf_generator import generate_receipt_pdf
-from arboric.receipts.signing import sign_receipt
+
+# Lazy import of signing to avoid cryptography dependency at module load
+try:
+    from arboric.receipts.signing import sign_receipt
+except EnterpriseFeatureNotAvailableError:
+
+    def sign_receipt(*args, **kwargs):  # type: ignore
+        raise EnterpriseFeatureNotAvailableError(
+            "Enterprise features not available. Install: pip install arboric[enterprise]"
+        )
+
+
+# Lazy import of pdf generator
+try:
+    from arboric.receipts.pdf_generator import generate_receipt_pdf
+except EnterpriseFeatureNotAvailableError:
+
+    def generate_receipt_pdf(*args, **kwargs):  # type: ignore
+        raise EnterpriseFeatureNotAvailableError(
+            "Enterprise features not available. Install: pip install arboric[enterprise]"
+        )
 
 
 def _detect_moer_source(config: ArboricConfig) -> str:

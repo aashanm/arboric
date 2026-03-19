@@ -3,6 +3,8 @@ Certified Carbon Receipt endpoint (Enterprise).
 """
 
 import base64
+from datetime import datetime
+from datetime import timezone as tz
 
 from fastapi import APIRouter, Depends, HTTPException, status
 
@@ -54,7 +56,13 @@ async def generate_receipt_endpoint(
         # Get grid forecast
         grid = get_grid(region=request.region, config=get_config())
         forecast_hours = request.forecast_hours or 48
-        forecast = grid.get_forecast(hours=forecast_hours)
+        # Pass appropriate time based on grid type
+        now_local = datetime.now().replace(minute=0, second=0, microsecond=0)
+        if type(grid).__name__ == "LiveGrid":
+            now_for_forecast = now_local.astimezone(tz.utc).replace(tzinfo=None)
+        else:
+            now_for_forecast = now_local
+        forecast = grid.get_forecast(hours=forecast_hours, start_time=now_for_forecast)
 
         # Run optimization
         schedule = autopilot.optimize_schedule(request.workload, forecast)
