@@ -293,6 +293,7 @@ def optimize(
     # Auto-record to history database
     if cfg.history.enabled:
         from pathlib import Path
+
         store = HistoryStore(Path(cfg.history.db_path).expanduser())
         data_source = "live" if type(grid).__name__ == "LiveGrid" else "mockgrid"
         store.record(result, region=region, data_source=data_source)
@@ -1173,6 +1174,7 @@ def history(
     elif format == "csv":
         import csv
         import sys
+
         writer = csv.DictWriter(sys.stdout, fieldnames=rows[0].keys())
         writer.writeheader()
         writer.writerows(rows)
@@ -1186,6 +1188,7 @@ def history(
 
         for row in rows:
             from datetime import datetime
+
             recorded = datetime.fromisoformat(row["recorded_at"])
             time_ago = (datetime.now(recorded.tzinfo) - recorded).total_seconds()
 
@@ -1242,25 +1245,29 @@ def insights(
         console.print_json(data=agg)
     else:  # table
         insights_text = f"""[bold white]Jobs Optimized[/bold white]
-{agg['total_jobs']}
+{agg["total_jobs"]}
 
 [bold white]Total Cost Saved[/bold white]
-${agg['total_cost_savings']:.2f}  (avg ${agg['total_cost_savings'] / agg['total_jobs']:.2f}/job)
+${agg["total_cost_savings"]:.2f}  (avg ${agg["total_cost_savings"] / agg["total_jobs"]:.2f}/job)
 
 [bold white]Total CO₂ Avoided[/bold white]
-{agg['total_carbon_savings_kg']:.1f} kg  (avg {agg['total_carbon_savings_kg'] / agg['total_jobs']:.1f} kg/job)
+{agg["total_carbon_savings_kg"]:.1f} kg  (avg {agg["total_carbon_savings_kg"] / agg["total_jobs"]:.1f} kg/job)
 
 [bold white]Avg Cost Savings[/bold white]
-{agg['avg_cost_savings_percent']:.1f}%
+{agg["avg_cost_savings_percent"]:.1f}%
 
 [bold white]Avg Carbon Savings[/bold white]
-{agg['avg_carbon_savings_percent']:.1f}%"""
+{agg["avg_carbon_savings_percent"]:.1f}%"""
 
         if agg["best_region"]:
-            insights_text += f"\n\n[bold white]Most Active Region[/bold white]\n{agg['best_region']}"
+            insights_text += (
+                f"\n\n[bold white]Most Active Region[/bold white]\n{agg['best_region']}"
+            )
 
         if agg["top_workload"]:
-            insights_text += f"\n\n[bold white]Top Optimized Job[/bold white]\n{agg['top_workload']}"
+            insights_text += (
+                f"\n\n[bold white]Top Optimized Job[/bold white]\n{agg['top_workload']}"
+            )
 
         panel = Panel(
             insights_text,

@@ -120,13 +120,21 @@ class HistoryStore:
                         result.optimized_cost,
                         result.baseline_cost,
                         result.baseline_cost - result.optimized_cost,
-                        ((result.baseline_cost - result.optimized_cost) / result.baseline_cost * 100)
+                        (
+                            (result.baseline_cost - result.optimized_cost)
+                            / result.baseline_cost
+                            * 100
+                        )
                         if result.baseline_cost > 0
                         else 0,
                         result.optimized_carbon_kg,
                         result.baseline_carbon_kg,
                         result.baseline_carbon_kg - result.optimized_carbon_kg,
-                        ((result.baseline_carbon_kg - result.optimized_carbon_kg) / result.baseline_carbon_kg * 100)
+                        (
+                            (result.baseline_carbon_kg - result.optimized_carbon_kg)
+                            / result.baseline_carbon_kg
+                            * 100
+                        )
                         if result.baseline_carbon_kg > 0
                         else 0,
                         json.dumps(self._serialize_result(result)),
@@ -316,7 +324,8 @@ class HistoryStore:
                 "optimal_end": result.optimal_end.isoformat(),
                 "baseline_start": result.baseline_start.isoformat(),
                 "baseline_end": result.baseline_end.isoformat(),
-                "delay_hours": (result.optimal_start - result.baseline_start).total_seconds() / 3600,
+                "delay_hours": (result.optimal_start - result.baseline_start).total_seconds()
+                / 3600,
             },
             "metrics": {
                 "optimized": {
@@ -340,7 +349,9 @@ class HistoryStore:
                     ),
                     "carbon_kg": result.baseline_carbon_kg - result.optimized_carbon_kg,
                     "carbon_percent": (
-                        (result.baseline_carbon_kg - result.optimized_carbon_kg) / result.baseline_carbon_kg * 100
+                        (result.baseline_carbon_kg - result.optimized_carbon_kg)
+                        / result.baseline_carbon_kg
+                        * 100
                         if result.baseline_carbon_kg > 0
                         else 0
                     ),
