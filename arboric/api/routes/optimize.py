@@ -8,7 +8,8 @@ from arboric.api.dependencies import get_autopilot
 from arboric.api.models.requests import OptimizeRequest
 from arboric.api.utils import create_api_response, serialize_schedule_for_api
 from arboric.core.autopilot import Autopilot
-from arboric.core.grid_oracle import MockGrid
+from arboric.core.config import get_config
+from arboric.core.grid_oracle import get_grid
 
 router = APIRouter()
 
@@ -37,7 +38,7 @@ async def optimize_workload(
     """
     try:
         # Get grid forecast
-        grid = MockGrid(region=request.region)
+        grid = get_grid(region=request.region, config=get_config())
         forecast_hours = request.forecast_hours or 48
         forecast = grid.get_forecast(hours=forecast_hours)
 

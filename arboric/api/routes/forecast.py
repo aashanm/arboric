@@ -5,7 +5,8 @@ Grid forecast endpoint.
 from fastapi import APIRouter, HTTPException, Query, status
 
 from arboric.api.utils import create_api_response
-from arboric.core.grid_oracle import MockGrid
+from arboric.core.config import get_config
+from arboric.core.grid_oracle import get_grid
 
 router = APIRouter()
 
@@ -33,7 +34,7 @@ async def get_forecast(
     """
     try:
         # Get grid forecast
-        grid = MockGrid(region=region)
+        grid = get_grid(region=region, config=get_config())
         forecast_df = grid.get_forecast(hours=hours)
 
         # Convert DataFrame to list of dicts

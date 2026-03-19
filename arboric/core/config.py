@@ -51,7 +51,10 @@ class DefaultWorkloadSettings(BaseModel):
 class LiveDataSettings(BaseModel):
     """Settings for live grid data integration."""
 
-    enabled: bool = Field(default=False, description="Enable live grid data")
+    enabled: bool = Field(
+        default=True,
+        description="Enable live grid data (auto-uses LiveGrid if arboric-cloud installed and credentials configured)",
+    )
     provider: str | None = Field(default=None, description="Data provider")
     api_key: str | None = Field(default=None, description="API key for live data provider")
     api_secret: str | None = Field(default=None, description="API secret for live data provider")
