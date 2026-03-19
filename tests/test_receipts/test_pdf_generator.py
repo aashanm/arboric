@@ -2,10 +2,17 @@
 
 from datetime import datetime
 
+import pytest
+
 from arboric.core.models import Workload, WorkloadType
 from arboric.receipts.models import CarbonReceipt, HourlyMOEREntry
-from arboric.receipts.pdf_generator import generate_receipt_pdf
-from arboric.receipts.signing import sign_receipt
+
+# Skip entire module if cryptography is not available
+try:
+    from arboric.receipts.pdf_generator import generate_receipt_pdf
+    from arboric.receipts.signing import sign_receipt
+except ImportError:
+    pytest.skip("cryptography not installed", allow_module_level=True)
 
 
 def test_generate_receipt_pdf_returns_bytes():

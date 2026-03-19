@@ -3,11 +3,17 @@
 from datetime import datetime
 
 import pandas as pd
+import pytest
 
 from arboric.core.config import ArboricConfig, OptimizationSettings
 from arboric.core.models import ScheduleResult, Workload, WorkloadType
-from arboric.receipts.service import generate_receipt
-from arboric.receipts.signing import verify_receipt
+
+# Skip entire module if cryptography is not available
+try:
+    from arboric.receipts.service import generate_receipt
+    from arboric.receipts.signing import verify_receipt
+except ImportError:
+    pytest.skip("cryptography not installed", allow_module_level=True)
 
 
 def test_generate_receipt_returns_tuple():

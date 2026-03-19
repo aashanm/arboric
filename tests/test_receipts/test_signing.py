@@ -2,16 +2,23 @@
 
 from datetime import datetime
 
+import pytest
+
 from arboric.core.models import Workload, WorkloadType
 from arboric.receipts.models import CarbonReceipt
-from arboric.receipts.signing import (
-    default_backend,
-    fingerprint,
-    generate_keypair,
-    load_pem_public_key,
-    sign_receipt,
-    verify_receipt,
-)
+
+# Skip entire module if cryptography is not available
+try:
+    from arboric.receipts.signing import (
+        default_backend,
+        fingerprint,
+        generate_keypair,
+        load_pem_public_key,
+        sign_receipt,
+        verify_receipt,
+    )
+except ImportError:
+    pytest.skip("cryptography not installed", allow_module_level=True)
 
 
 def test_generate_keypair_returns_pem_bytes():
