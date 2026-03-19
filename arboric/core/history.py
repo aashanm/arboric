@@ -14,8 +14,7 @@ import json
 import logging
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from sqlite3 import connect, Row
-from typing import Optional
+from sqlite3 import Row, connect
 
 from arboric.core.models import ScheduleResult
 
@@ -140,8 +139,8 @@ class HistoryStore:
     def query(
         self,
         limit: int = 20,
-        since_days: Optional[int] = 30,
-        region: Optional[str] = None,
+        since_days: int | None = 30,
+        region: str | None = None,
     ) -> list[dict]:
         """
         Query historical runs.
@@ -195,8 +194,8 @@ class HistoryStore:
 
     def aggregate(
         self,
-        since_days: Optional[int] = 30,
-        region: Optional[str] = None,
+        since_days: int | None = 30,
+        region: str | None = None,
     ) -> dict:
         """
         Get ROI summary statistics.

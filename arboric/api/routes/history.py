@@ -8,7 +8,6 @@ Provides REST API access to historical optimization data for:
 """
 
 from pathlib import Path
-from typing import Optional
 
 from fastapi import APIRouter, Depends, Query
 
@@ -23,8 +22,8 @@ router = APIRouter()
 @router.get("/history")
 async def get_history(
     limit: int = Query(20, ge=1, le=500, description="Max results"),
-    since_days: Optional[int] = Query(30, description="Days to look back (None = all time)"),
-    region: Optional[str] = Query(None, description="Filter by region (US-WEST, US-EAST, etc)"),
+    since_days: int | None = Query(30, description="Days to look back (None = all time)"),
+    region: str | None = Query(None, description="Filter by region (US-WEST, US-EAST, etc)"),
     config: ArboricConfig = Depends(get_arboric_config),
 ):
     """
@@ -58,8 +57,8 @@ async def get_history(
 
 @router.get("/insights")
 async def get_insights(
-    since_days: Optional[int] = Query(30, description="Days to look back (None = all time)"),
-    region: Optional[str] = Query(None, description="Filter by region (optional)"),
+    since_days: int | None = Query(30, description="Days to look back (None = all time)"),
+    region: str | None = Query(None, description="Filter by region (optional)"),
     config: ArboricConfig = Depends(get_arboric_config),
 ):
     """

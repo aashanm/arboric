@@ -6,7 +6,6 @@ for cost and carbon optimization. Built with Typer and Rich.
 """
 
 import time
-from pathlib import Path
 
 import typer
 from rich import box
@@ -1166,11 +1165,10 @@ def history(
 
     if not rows:
         console.print("[yellow]No optimization history found.[/yellow]")
-        console.print(f"Run 'arboric optimize' to start tracking your workloads.")
+        console.print("Run 'arboric optimize' to start tracking your workloads.")
         return
 
     if format == "json":
-        import json
         console.print_json(data=rows)
     elif format == "csv":
         import csv
@@ -1237,11 +1235,10 @@ def insights(
 
     if agg["total_jobs"] == 0:
         console.print("[yellow]No history for the selected period.[/yellow]")
-        console.print(f"Run 'arboric optimize' to start tracking your workloads.")
+        console.print("Run 'arboric optimize' to start tracking your workloads.")
         return
 
     if format == "json":
-        import json
         console.print_json(data=agg)
     else:  # table
         insights_text = f"""[bold white]Jobs Optimized[/bold white]
