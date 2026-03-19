@@ -26,6 +26,7 @@ from rich.text import Text
 from arboric.core.autopilot import Autopilot, OptimizationConfig
 from arboric.core.config import ArboricConfig, get_config
 from arboric.core.grid_oracle import MockGrid
+from arboric.core.history import HistoryStore
 from arboric.core.models import FleetOptimizationResult, Workload, WorkloadType
 
 # Initialize Rich console
@@ -288,6 +289,14 @@ def optimize(
     )
     autopilot = Autopilot(config=opt_config)
     result = autopilot.optimize_schedule(workload, forecast)
+
+    # Auto-record to history database
+    if cfg.history.enabled:
+        from pathlib import Path
+
+        store = HistoryStore(Path(cfg.history.db_path).expanduser())
+        data_source = "live" if type(grid).__name__ == "LiveGrid" else "mockgrid"
+        store.record(result, region=region, data_source=data_source)
 
     # Handle export if requested
     if output:
@@ -1127,6 +1136,146 @@ def config(
     else:
         console.print(f"[{ARBORIC_RED}]Unknown action: {action}[/{ARBORIC_RED}]")
         console.print("\nAvailable actions: show, init, edit, path")
+
+
+@app.command()
+def history(
+    limit: int = typer.Option(20, "--limit", "-l", help="Number of runs to display"),
+    since: str = typer.Option("30d", "--since", "-s", help="Time period: 7d, 30d, 90d, all"),
+    region: str | None = typer.Option(None, "--region", "-r", help="Filter by region"),
+    format: str = typer.Option("table", "--format", "-f", help="Output format: table, json, csv"),
+):
+    """
+    View historical optimization runs and ROI metrics.
+
+    Example: arboric history
+    Example: arboric history --limit 10 --since 7d --region US-WEST
+    Example: arboric history --format json
+    """
+    from pathlib import Path
+
+    cfg = get_config()
+
+    # Parse since parameter
+    since_days_map = {"7d": 7, "30d": 30, "90d": 90, "all": None}
+    since_days = since_days_map.get(since, 30)
+
+    # Load history
+    store = HistoryStore(Path(cfg.history.db_path).expanduser())
+    rows = store.query(limit=limit, since_days=since_days, region=region)
+
+    if not rows:
+        console.print("[yellow]No optimization history found.[/yellow]")
+        console.print("Run 'arboric optimize' to start tracking your workloads.")
+        return
+
+    if format == "json":
+        console.print_json(data=rows)
+    elif format == "csv":
+        import csv
+        import sys
+
+        writer = csv.DictWriter(sys.stdout, fieldnames=rows[0].keys())
+        writer.writeheader()
+        writer.writerows(rows)
+    else:  # table
+        table = Table(title="Optimization History", box=box.ROUNDED, show_header=True)
+        table.add_column("Job", style=ARBORIC_BLUE)
+        table.add_column("When", style=ARBORIC_AMBER)
+        table.add_column("Cost Saved", style=ARBORIC_GREEN)
+        table.add_column("CO₂ Avoided", style=ARBORIC_GREEN)
+        table.add_column("Region", style=ARBORIC_PURPLE)
+
+        for row in rows:
+            from datetime import datetime
+
+            recorded = datetime.fromisoformat(row["recorded_at"])
+            time_ago = (datetime.now(recorded.tzinfo) - recorded).total_seconds()
+
+            if time_ago < 3600:
+                when = f"{int(time_ago / 60)}m ago"
+            elif time_ago < 86400:
+                when = f"{int(time_ago / 3600)}h ago"
+            else:
+                when = f"{int(time_ago / 86400)}d ago"
+
+            table.add_row(
+                row["workload_name"],
+                when,
+                f"${row['cost_savings']:.2f}" if row["cost_savings"] else "—",
+                f"{row['carbon_savings_kg']:.1f} kg" if row["carbon_savings_kg"] else "—",
+                row["region"] or "—",
+            )
+
+        console.print(table)
+        console.print(f"\n[dim]Showing {len(rows)} of {limit} results from last {since}[/dim]")
+
+
+@app.command()
+def insights(
+    period: str = typer.Option("30d", "--period", "-p", help="Time period: 7d, 30d, 90d, all"),
+    region: str | None = typer.Option(None, "--region", "-r", help="Filter by region"),
+    format: str = typer.Option("table", "--format", "-f", help="Output format: table, json"),
+):
+    """
+    View ROI insights and savings summary.
+
+    Example: arboric insights
+    Example: arboric insights --period 90d --region US-WEST
+    Example: arboric insights --format json
+    """
+    from pathlib import Path
+
+    cfg = get_config()
+
+    # Parse period parameter
+    period_days_map = {"7d": 7, "30d": 30, "90d": 90, "all": None}
+    period_days = period_days_map.get(period, 30)
+
+    # Get aggregated insights
+    store = HistoryStore(Path(cfg.history.db_path).expanduser())
+    agg = store.aggregate(since_days=period_days, region=region)
+
+    if agg["total_jobs"] == 0:
+        console.print("[yellow]No history for the selected period.[/yellow]")
+        console.print("Run 'arboric optimize' to start tracking your workloads.")
+        return
+
+    if format == "json":
+        console.print_json(data=agg)
+    else:  # table
+        insights_text = f"""[bold white]Jobs Optimized[/bold white]
+{agg["total_jobs"]}
+
+[bold white]Total Cost Saved[/bold white]
+${agg["total_cost_savings"]:.2f}  (avg ${agg["total_cost_savings"] / agg["total_jobs"]:.2f}/job)
+
+[bold white]Total CO₂ Avoided[/bold white]
+{agg["total_carbon_savings_kg"]:.1f} kg  (avg {agg["total_carbon_savings_kg"] / agg["total_jobs"]:.1f} kg/job)
+
+[bold white]Avg Cost Savings[/bold white]
+{agg["avg_cost_savings_percent"]:.1f}%
+
+[bold white]Avg Carbon Savings[/bold white]
+{agg["avg_carbon_savings_percent"]:.1f}%"""
+
+        if agg["best_region"]:
+            insights_text += (
+                f"\n\n[bold white]Most Active Region[/bold white]\n{agg['best_region']}"
+            )
+
+        if agg["top_workload"]:
+            insights_text += (
+                f"\n\n[bold white]Top Optimized Job[/bold white]\n{agg['top_workload']}"
+            )
+
+        panel = Panel(
+            insights_text,
+            title=f"[bold]ROI Insights — {period}",
+            border_style=ARBORIC_GREEN,
+            padding=(1, 2),
+        )
+        console.print(panel)
 
 
 @app.command()

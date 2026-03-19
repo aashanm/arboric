@@ -52,7 +52,7 @@ class LiveDataSettings(BaseModel):
     """Settings for live grid data integration."""
 
     enabled: bool = Field(default=False, description="Enable live grid data")
-    provider: str | None = Field(default=None, description="Data provider (e.g., 'watttime')")
+    provider: str | None = Field(default=None, description="Data provider")
     api_key: str | None = Field(default=None, description="API key for live data provider")
     api_secret: str | None = Field(default=None, description="API secret for live data provider")
 
@@ -66,6 +66,13 @@ class CLISettings(BaseModel):
     auto_approve: bool = Field(default=False, description="Skip confirmation prompts")
 
 
+class HistorySettings(BaseModel):
+    """Historical optimization tracking settings."""
+
+    enabled: bool = Field(default=True, description="Auto-record every optimization run")
+    db_path: str = Field(default="~/.arboric/history.db", description="SQLite database path")
+
+
 class ArboricConfig(BaseModel):
     """
     Main Arboric configuration model.
@@ -77,6 +84,7 @@ class ArboricConfig(BaseModel):
     defaults: DefaultWorkloadSettings = Field(default_factory=DefaultWorkloadSettings)
     live_data: LiveDataSettings = Field(default_factory=LiveDataSettings)
     cli: CLISettings = Field(default_factory=CLISettings)
+    history: HistorySettings = Field(default_factory=HistorySettings)
 
     @classmethod
     def get_config_path(cls) -> Path:

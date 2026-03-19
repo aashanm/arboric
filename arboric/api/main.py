@@ -12,7 +12,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import ValidationError
 
-from arboric.api.routes import config, fleet, forecast, optimize, status
+from arboric.api.routes import config, fleet, forecast, history, optimize, status
 
 # Create FastAPI app
 app = FastAPI(
@@ -40,7 +40,7 @@ No rate limiting currently enforced.
     version="0.1.0",
     docs_url="/docs",
     redoc_url="/redoc",
-    contact={"name": "Arboric Team", "email": "team@arboric.dev"},
+    contact={"name": "Arboric Team", "email": "aashan5050@gmail.com"},
     license_info={"name": "MIT", "url": "https://opensource.org/licenses/MIT"},
 )
 
@@ -59,6 +59,7 @@ app.include_router(fleet.router, prefix="/api/v1/fleet", tags=["Fleet"])
 app.include_router(forecast.router, prefix="/api/v1", tags=["Forecast"])
 app.include_router(status.router, prefix="/api/v1", tags=["Status"])
 app.include_router(config.router, prefix="/api/v1", tags=["Configuration"])
+app.include_router(history.router, prefix="/api/v1", tags=["History"])
 
 
 # Root endpoint
