@@ -12,7 +12,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import ValidationError
 
-from arboric.api.routes import config, fleet, forecast, history, optimize, status
+from arboric.api.routes import config, fleet, forecast, history, optimize, receipt, status
 
 # Create FastAPI app
 app = FastAPI(
@@ -55,6 +55,7 @@ app.add_middleware(
 
 # Include routers
 app.include_router(optimize.router, prefix="/api/v1", tags=["Optimization"])
+app.include_router(receipt.router, prefix="/api/v1", tags=["Receipts"])
 app.include_router(fleet.router, prefix="/api/v1/fleet", tags=["Fleet"])
 app.include_router(forecast.router, prefix="/api/v1", tags=["Forecast"])
 app.include_router(status.router, prefix="/api/v1", tags=["Status"])

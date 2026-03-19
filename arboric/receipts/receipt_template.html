@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Arboric Certified Carbon Receipt</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        html, body { margin: 0; padding: 0; background: white; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+        .receipt-page {
+            background: white;
+            width: 100%;
+            margin: 0;
+            padding: 40px;
+            box-sizing: border-box;
+            font-size: 11px;
+            line-height: 1.4;
+        }
+        .receipt-mono { font-family: "Courier New", monospace; }
+        .hash-display {
+            word-break: break-all;
+            font-size: 0.8em;
+            line-height: 1.3;
+        }
+        @media print {
+            html, body { margin: 0; padding: 0; }
+            .receipt-page { margin: 0; box-shadow: none; }
+        }
+    </style>
+</head>
+<body>
+    <div class="receipt-page text-slate-900">
+        <!-- HEADER -->
+        <div class="flex justify-between items-start pb-4 border-b-2 border-slate-200 mb-4">
+            <div>
+                <h1 class="text-3xl font-bold text-slate-900">Arboric</h1>
+                <p class="text-xs text-slate-500">Carbon Intelligence Platform</p>
+            </div>
+            <div class="text-right">
+                <p class="text-xs font-bold text-slate-700">CERTIFIED</p>
+                <h2 class="text-xl font-bold text-slate-900">CARBON REDUCTION SUMMARY</h2>
+                <p class="text-xs text-slate-500">CARBON IMPACT RECEIPT</p>
+            </div>
+        </div>
+
+        <!-- IMPACT RIBBON -->
+        <div class="bg-emerald-50 rounded px-3 py-2 mb-4 flex justify-between items-center">
+            <div>
+                <p class="text-sm font-bold text-emerald-600">
+                    {{ "%.1f" | format(cost_savings_percent) }}%
+                </p>
+                <p class="text-xs text-slate-500 uppercase">Cost Efficiency</p>
+            </div>
+            <div class="border-l border-emerald-200 h-6"></div>
+            <div>
+                <p class="text-sm font-bold text-blue-600">
+                    {{ "%.1f" | format(carbon_savings_percent) }}%
+                </p>
+                <p class="text-xs text-slate-500 uppercase">Carbon Avoided (Scope 3)</p>
+            </div>
+        </div>
+
+        <!-- TWO-COLUMN BODY -->
+        <div class="grid grid-cols-2 gap-6 mb-4 pb-4 border-b border-slate-200">
+            <!-- Left: Workload Details -->
+            <div>
+                <h3 class="text-xs font-bold text-slate-700 uppercase mb-3">Workload Details</h3>
+                <div class="space-y-3 text-xs">
+                    <div class="flex justify-between pb-2 border-b border-slate-200">
+                        <span class="text-slate-500 uppercase">Workload ID</span>
+                        <span class="font-bold text-slate-900 receipt-mono">#{{ receipt_id_short }}</span>
+                    </div>
+                    <div class="flex justify-between pb-2 border-b border-slate-200">
+                        <span class="text-slate-500 uppercase">Job Type</span>
+                        <span class="font-bold text-slate-900">{{ workload_type }}</span>
+                    </div>
+                    <div class="flex justify-between pb-2 border-b border-slate-200">
+                        <span class="text-slate-500 uppercase">Power Draw</span>
+                        <span class="font-bold text-slate-900">{{ "%.0f" | format(power_draw_kw) }} kW</span>
+                    </div>
+                    <div class="flex justify-between pb-2 border-b border-slate-200">
+                        <span class="text-slate-500 uppercase">Grid Region</span>
+                        <span class="font-bold text-slate-900">{{ region }} (CAISO)</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-slate-500 uppercase">Compliance</span>
+                        <span class="font-bold text-slate-900">SB 253 Scope 3</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right: Optimization Summary -->
+            <div>
+                <h3 class="text-xs font-bold text-slate-700 uppercase mb-3">Optimization Summary</h3>
+                <div class="space-y-3 text-xs">
+                    <div class="flex justify-between pb-2 border-b border-slate-200">
+                        <span class="text-slate-500 uppercase">Baseline Cost</span>
+                        <span class="font-bold text-emerald-600">
+                            ${{ "%.0f" | format(baseline_cost) }} → ${{ "%.0f" | format(optimized_cost) }} ↓
+                        </span>
+                    </div>
+                    <div class="flex justify-between pb-2 border-b border-slate-200">
+                        <span class="text-slate-500 uppercase">Avg Carbon</span>
+                        <span class="font-bold text-emerald-600">
+                            {{ "%.1f" | format(baseline_avg_carbon) }} → {{ "%.1f" | format(optimized_avg_carbon) }} gCO₂/kWh ↓
+                        </span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-slate-500 uppercase">Renewable</span>
+                        <span class="font-bold text-blue-600">{{ "%.1f" | format(avg_renewable) }}% → {{ "%.1f" | format(carbon_savings_percent) }}% ↑</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- GRID EMISSIONS -->
+        <div class="mb-4 pb-4 border-b border-slate-200">
+            <h3 class="text-xs font-bold text-slate-700 uppercase mb-2">
+                Grid Emissions — Optimal Window
+            </h3>
+            <!-- Hourly cells -->
+            <div class="grid gap-0.5 mb-2" style="grid-template-columns: repeat({{ moer_count }}, 1fr);">
+                {% for entry in hourly_moer %}
+                <div>
+                    <div class="text-center text-xs font-bold text-slate-900 mb-1">
+                        {{ entry.hour }}:00
+                    </div>
+                    <div class="{% if entry.color == 'emerald' %}bg-emerald-600{% elif entry.color == 'amber' %}bg-amber-500{% else %}bg-red-600{% endif %} text-white text-center py-1 text-xs font-bold receipt-mono">
+                        {{ "%.1f" | format(entry.co2) }}
+                    </div>
+                    <div class="bg-slate-100 text-center py-1 text-xs text-slate-700">
+                        {{ "%.1f" | format(entry.renewable) }}%
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            <p class="text-xs text-slate-500">Carbon Intensity (gCO₂/kWh) · Renewable energy %</p>
+        </div>
+
+        <!-- EXECUTION SHIFT -->
+        <div class="mb-4 pb-4 border-b border-slate-200">
+            <h3 class="text-xs font-bold text-slate-700 uppercase mb-3">Execution Shift</h3>
+
+            <!-- Baseline track: label above bar (stacked vertically) -->
+            <div class="mb-4">
+                <div class="text-xs font-bold text-slate-700 uppercase mb-1">Baseline</div>
+                <div class="relative h-2 bg-slate-100 rounded">
+                    <div
+                        class="h-full bg-slate-400"
+                        style="position: absolute; left: {{ baseline_margin_left }}%; width: {{ bar_width }}%;"
+                    ></div>
+                </div>
+            </div>
+
+            <!-- Optimized track: label above bar (stacked vertically) -->
+            <div class="mb-4">
+                <div class="text-xs font-bold text-emerald-600 uppercase mb-1">Optimized</div>
+                <div class="relative h-2 bg-slate-100 rounded">
+                    <div
+                        class="h-full bg-emerald-600 flex items-center justify-center"
+                        style="position: absolute; left: {{ optimal_margin_left }}%; width: {{ bar_width }}%;"
+                    >
+                        <span class="text-xs font-bold text-emerald-600 absolute -top-4 left-1/2 -translate-x-1/2 whitespace-nowrap">
+                            Shifted +{{ delay_hours }}h
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Hour axis -->
+            <div class="flex justify-between text-xs text-slate-500 mt-4">
+                <span>00:00</span>
+                <span>06:00</span>
+                <span>12:00</span>
+                <span>18:00</span>
+                <span>24:00</span>
+            </div>
+        </div>
+
+        <!-- CRYPTOGRAPHIC VERIFICATION -->
+        <div class="bg-slate-50 border border-slate-200 rounded p-3 mb-4">
+            <h3 class="text-xs font-bold text-slate-700 uppercase pb-2 mb-2 border-b border-slate-200">
+                Cryptographic Verification
+            </h3>
+            <div class="space-y-2 text-xs">
+                <div class="flex justify-between">
+                    <span class="text-slate-500 uppercase">Algorithm</span>
+                    <span class="font-bold text-slate-900 receipt-mono">{{ signature_algorithm }}</span>
+                </div>
+                <div class="flex justify-between items-start gap-2">
+                    <span class="text-slate-500 uppercase">Data Hash</span>
+                    <span class="font-bold text-slate-900 receipt-mono hash-display text-right">{{ signature_hash }}</span>
+                </div>
+                <div class="flex justify-between border-b border-slate-200 pb-2">
+                    <span class="text-slate-500 uppercase">Signature</span>
+                    <span class="font-bold text-slate-900 receipt-mono">{{ signature_id }}</span>
+                </div>
+                <p class="text-slate-500 italic text-xs pt-1">
+                    Cryptographically signed and tamper-evident. Retain for Scope 3 emissions and audit submissions.
+                </p>
+            </div>
+        </div>
+
+        <!-- FOOTER -->
+        <div class="text-xs text-slate-500 border-t border-slate-200 pt-3 flex justify-between">
+            <div>
+                <p class="font-bold text-slate-700">Arboric Carbon Intelligence</p>
+                <p class="text-emerald-600">arboric.xyz</p>
+            </div>
+            <div class="text-center">
+                <p class="font-bold text-slate-700 uppercase">California SB 253 Scope 3</p>
+                <p class="text-slate-500 text-xs">Certified Carbon Avoidance Receipt</p>
+            </div>
+            <div class="text-right">
+                <p class="font-bold receipt-mono">Receipt #{{ receipt_id_short }}</p>
+                <p>{{ generated_at }}</p>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

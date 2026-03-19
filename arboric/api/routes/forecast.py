@@ -2,10 +2,14 @@
 Grid forecast endpoint.
 """
 
+from datetime import datetime
+from datetime import timezone as tz
+
 from fastapi import APIRouter, HTTPException, Query, status
 
 from arboric.api.utils import create_api_response
-from arboric.core.grid_oracle import MockGrid
+from arboric.core.config import get_config
+from arboric.core.grid_oracle import get_grid
 
 router = APIRouter()
 
@@ -33,8 +37,14 @@ async def get_forecast(
     """
     try:
         # Get grid forecast
-        grid = MockGrid(region=region)
-        forecast_df = grid.get_forecast(hours=hours)
+        grid = get_grid(region=region, config=get_config())
+        # Pass appropriate time based on grid type
+        now_local = datetime.now().replace(minute=0, second=0, microsecond=0)
+        if type(grid).__name__ == "LiveGrid":
+            now_for_forecast = now_local.astimezone(tz.utc).replace(tzinfo=None)
+        else:
+            now_for_forecast = now_local
+        forecast_df = grid.get_forecast(hours=hours, start_time=now_for_forecast)
 
         # Convert DataFrame to list of dicts
         forecast_data = forecast_df.reset_index().to_dict(orient="records")

@@ -3,13 +3,11 @@
 
 # Optimization algorithm settings
 optimization:
-  # Weight for cost optimization (0-1)
-  # Higher values prioritize electricity cost savings
-  price_weight: 0.7
+  # Cost weight (0-1): Higher = prioritize cost savings
+  cost_weight: 0.7
 
-  # Weight for carbon optimization (0-1)
-  # Higher values prioritize carbon emission reduction
-  # Note: price_weight + carbon_weight must equal 1.0
+  # Carbon weight (0-1): Higher = prioritize carbon reduction
+  # Note: cost_weight + carbon_weight must equal 1.0
   carbon_weight: 0.3
 
   # Minimum delay before starting workloads (hours)
@@ -35,14 +33,15 @@ defaults:
   # Options: US-WEST, US-EAST, EU-WEST, NORDIC
   region: US-WEST
 
-# External API integration settings
-api:
-  # Live data source credentials (for real-time grid data)
-  # Leave empty to use MockGrid simulation
-  # For live data integrations, install: pip install arboric[cloud]
-  live_api_username: null
-  live_api_password: null
-  live_api_enabled: false
+# Live grid data settings (optional)
+# By default, Arboric uses realistic MockGrid simulation
+# For live emissions data, install: pip install arboric[cloud]
+# Then configure your provider credentials below
+live_data:
+  enabled: false
+  provider: "YOUR_EMISSIONS_PROVIDER"
+  api_key: "YOUR_PROVIDER_API_KEY"
+  api_secret: "YOUR_PROVIDER_API_SECRET"
 
 # CLI display and behavior settings
 cli:

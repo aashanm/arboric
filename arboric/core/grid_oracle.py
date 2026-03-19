@@ -80,11 +80,13 @@ class MockGrid:
             region: Grid region identifier (US-WEST, US-EAST, EU-WEST, NORDIC)
             seed: Random seed for reproducible forecasts (None for varied demos)
         """
-        self.region = region
-        if region not in REGION_PROFILES:
-            raise ValueError(f"Unknown region: {region}. Available: {list(REGION_PROFILES.keys())}")
+        self.region = region.upper()
+        if self.region not in REGION_PROFILES:
+            raise ValueError(
+                f"Unknown region: {self.region}. Available: {list(REGION_PROFILES.keys())}"
+            )
 
-        self.profile = REGION_PROFILES[region]
+        self.profile = REGION_PROFILES[self.region]
 
         # Use instance-specific random generator for reproducible results
         self._random = random.Random(seed)
@@ -239,7 +241,11 @@ class MockGrid:
         Returns:
             DataFrame with timestamp, co2_intensity, price, renewable_percentage
         """
-        now = (start_time or datetime.now()).replace(minute=0, second=0, microsecond=0)
+        # Round UP to next hour if past the :00 minute, ensuring forecast never starts from past
+        dt = start_time or datetime.now()
+        now = dt.replace(minute=0, second=0, microsecond=0)
+        if dt != now:  # Time had to be adjusted, so we were past the hour boundary
+            now += timedelta(hours=1)
         windows = []
 
         intervals = (hours * 60) // resolution_minutes
@@ -349,7 +355,7 @@ class MockGrid:
         return events
 
 
-def get_grid(region: str = "US-WEST", config=None) -> MockGrid:  # type: ignore
+def get_grid(region: str = "US-WEST", config=None, seed: int | None = None) -> MockGrid:  # type: ignore
     """Factory function to create a grid oracle for a region.
 
     Returns LiveGrid (from arboric-cloud) if available and credentials configured,
@@ -358,10 +364,15 @@ def get_grid(region: str = "US-WEST", config=None) -> MockGrid:  # type: ignore
     Args:
         region: Grid region identifier
         config: Optional ArboricConfig instance (loaded from file if None)
+        seed: Optional random seed. If None and using MockGrid, seeds based on current date
+              for reproducibility within a day.
 
     Returns:
         Grid provider instance (LiveGrid or MockGrid)
     """
+    # Normalize region to uppercase
+    region = region.upper()
+
     if config is None:
         from arboric.core.config import get_config
 
@@ -391,4 +402,9 @@ def get_grid(region: str = "US-WEST", config=None) -> MockGrid:  # type: ignore
             logging.warning(f"Failed to initialize LiveGrid: {e}. Falling back to MockGrid.")
 
     # Default: return MockGrid simulation
-    return MockGrid(region=region)
+    # Use date-based seed for reproducibility (same day = same forecast)
+    if seed is None:
+        from datetime import datetime as dt
+
+        seed = int(dt.now().strftime("%Y%m%d"))
+    return MockGrid(region=region, seed=seed)

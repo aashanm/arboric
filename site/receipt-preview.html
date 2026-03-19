@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Arboric Certified Carbon Receipt — Preview</title>
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <style>
+        html, body { margin: 0; padding: 0; background: #f5f5f5; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+        .receipt-page {
+            background: white;
+            max-width: 650px;
+            margin: 20px auto;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            padding: 40px;
+            font-size: 11px;
+            line-height: 1.4;
+        }
+        .receipt-mono { font-family: "Courier New", monospace; }
+        .rule { border-top: 0.5px solid #e2e8f0; margin: 8px 0; }
+        .divider-vertical { border-left: 0.5px solid #a7f3d0; height: 16px; }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const React = window.React;
+        const { useState, useMemo } = React;
+
+        // Mock data matching ANALYSIS.md reference demo
+        const MOCK_RECEIPT = {
+            receiptId: "A1B2C3D4",
+            generated: "2026-03-18 14:30 UTC",
+            workload: {
+                name: "LLM Training",
+                type: "ml_training",
+                power: 120,
+                duration: 6,
+            },
+            costSavingsPct: 41.5,
+            carbonAvoidedPct: 59.0,
+            costSavings: 45.57,
+            carbonSavingsKg: 193.68,
+            baselineCost: 109.85,
+            optimizedCost: 64.28,
+            baselineCarbon: 328.27,
+            optimizedCarbon: 134.59,
+            baselineAvgCarbon: 410,
+            optimizedAvgCarbon: 280,
+            baselineStart: "18:00",
+            optimalStart: "02:00",
+            delayHours: 8,
+            region: "US-WEST",
+            moer: [
+                { hour: "02", co2: 212, renewable: 78, color: "emerald" },
+                { hour: "03", co2: 199, renewable: 82, color: "emerald" },
+                { hour: "04", co2: 223, renewable: 75, color: "emerald" },
+                { hour: "05", co2: 242, renewable: 68, color: "amber" },
+                { hour: "06", co2: 268, renewable: 61, color: "amber" },
+                { hour: "07", co2: 289, renewable: 54, color: "red" },
+            ],
+            signature: {
+                algorithm: "ECDSA-P256-SHA256",
+                hash: "a4b8c2d1e3f0c8b5d2a9e4f1...",
+                id: "#A1B2C3D4",
+            },
+        };
+
+        function ReceiptPreview() {
+            return (
+                <div className="receipt-page text-slate-900">
+                    {/* HEADER */}
+                    <div className="flex justify-between items-start pb-4 border-b-2 border-slate-200 mb-4">
+                        <div>
+                            <h1 className="text-3xl font-bold text-slate-900">Arboric</h1>
+                            <p className="text-xs text-slate-500">Carbon Intelligence Platform</p>
+                        </div>
+                        <div className="text-right">
+                            <p className="text-xs font-bold text-slate-700">CERTIFICATION OF</p>
+                            <h2 className="text-xl font-bold text-slate-900">CARBON AVOIDANCE</h2>
+                            <p className="text-xs text-slate-500">CARBON IMPACT RECEIPT</p>
+                        </div>
+                    </div>
+
+                    {/* IMPACT RIBBON */}
+                    <div className="bg-emerald-50 rounded px-3 py-2 mb-4 flex justify-between items-center">
+                        <div>
+                            <p className="text-sm font-bold text-emerald-600">
+                                {MOCK_RECEIPT.costSavingsPct.toFixed(1)}%
+                            </p>
+                            <p className="text-xs text-slate-500 uppercase">Cost Efficiency</p>
+                        </div>
+                        <div className="border-l border-emerald-200 h-6"></div>
+                        <div>
+                            <p className="text-sm font-bold text-blue-600">
+                                {MOCK_RECEIPT.carbonAvoidedPct.toFixed(1)}%
+                            </p>
+                            <p className="text-xs text-slate-500 uppercase">Carbon Avoided (Scope 3)</p>
+                        </div>
+                    </div>
+
+                    {/* TWO-COLUMN BODY */}
+                    <div className="grid grid-cols-2 gap-6 mb-4 pb-4 border-b border-slate-200">
+                        {/* Workload Details */}
+                        <div>
+                            <h3 className="text-xs font-bold text-slate-700 uppercase mb-3">Workload Details</h3>
+                            <div className="space-y-3 text-xs">
+                                <div className="flex justify-between pb-2 border-b border-slate-200">
+                                    <span className="text-slate-500 uppercase">Workload ID</span>
+                                    <span className="font-bold text-slate-900 receipt-mono">#W{MOCK_RECEIPT.receiptId}</span>
+                                </div>
+                                <div className="flex justify-between pb-2 border-b border-slate-200">
+                                    <span className="text-slate-500 uppercase">Job Type</span>
+                                    <span className="font-bold text-slate-900">{MOCK_RECEIPT.workload.type}</span>
+                                </div>
+                                <div className="flex justify-between pb-2 border-b border-slate-200">
+                                    <span className="text-slate-500 uppercase">Power Draw</span>
+                                    <span className="font-bold text-slate-900">{MOCK_RECEIPT.workload.power} kW</span>
+                                </div>
+                                <div className="flex justify-between pb-2 border-b border-slate-200">
+                                    <span className="text-slate-500 uppercase">Grid Region</span>
+                                    <span className="font-bold text-slate-900">{MOCK_RECEIPT.region} (CAISO)</span>
+                                </div>
+                                <div className="flex justify-between">
+                                    <span className="text-slate-500 uppercase">Compliance</span>
+                                    <span className="font-bold text-slate-900">SB 253 Scope 3</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Optimization Summary */}
+                        <div>
+                            <h3 className="text-xs font-bold text-slate-700 uppercase mb-3">Optimization Summary</h3>
+                            <div className="space-y-3 text-xs">
+                                <div className="flex justify-between pb-2 border-b border-slate-200">
+                                    <span className="text-slate-500 uppercase">Baseline Cost</span>
+                                    <span className="font-bold text-emerald-600">
+                                        ${MOCK_RECEIPT.baselineCost.toFixed(0)} → ${MOCK_RECEIPT.optimizedCost.toFixed(0)} ↑
+                                    </span>
+                                </div>
+                                <div className="flex justify-between pb-2 border-b border-slate-200">
+                                    <span className="text-slate-500 uppercase">Avg Carbon</span>
+                                    <span className="font-bold text-emerald-600">
+                                        {MOCK_RECEIPT.baselineAvgCarbon} → {MOCK_RECEIPT.optimizedAvgCarbon} gCO₂/kWh ↑
+                                    </span>
+                                </div>
+                                <div className="flex justify-between">
+                                    <span className="text-slate-500 uppercase">Renewable</span>
+                                    <span className="font-bold text-blue-600">65% → 59.0% ↑</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* GRID EMISSIONS */}
+                    <div className="mb-4 pb-4 border-b border-slate-200">
+                        <h3 className="text-xs font-bold text-slate-700 uppercase mb-2">
+                            Grid Emissions — Optimal Window
+                        </h3>
+                        {/* Hourly cells */}
+                        <div className="grid gap-0.5 mb-2" style={{ gridTemplateColumns: `repeat(${MOCK_RECEIPT.moer.length}, 1fr)` }}>
+                            {MOCK_RECEIPT.moer.map((entry, i) => {
+                                const colorMap = {
+                                    emerald: "bg-emerald-600 text-white",
+                                    amber: "bg-amber-500 text-white",
+                                    red: "bg-red-600 text-white",
+                                };
+                                const bgColor = colorMap[entry.color] || "bg-slate-200";
+                                return (
+                                    <div key={i}>
+                                        <div className="text-center text-xs font-bold text-slate-900 mb-1">
+                                            {entry.hour}:00
+                                        </div>
+                                        <div className={`${bgColor} text-center py-1 text-xs font-bold receipt-mono`}>
+                                            {entry.co2}
+                                        </div>
+                                        <div className="bg-slate-100 text-center py-1 text-xs text-slate-700">
+                                            {entry.renewable}%
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                        <p className="text-xs text-slate-500">Carbon Intensity (gCO₂/kWh) · Renewable energy %</p>
+                    </div>
+
+                    {/* EXECUTION SHIFT */}
+                    <div className="mb-4 pb-4 border-b border-slate-200">
+                        <h3 className="text-xs font-bold text-slate-700 uppercase mb-3">Execution Shift</h3>
+
+                        {/* Baseline track */}
+                        <div className="flex items-center gap-2 mb-2">
+                            <span className="text-xs font-bold text-slate-700 w-20 uppercase">Baseline</span>
+                            <div className="flex-1 relative h-2 bg-slate-100 rounded">
+                                <div
+                                    className="h-full bg-slate-400"
+                                    style={{
+                                        marginLeft: "30%",
+                                        width: "25%",
+                                    }}
+                                />
+                            </div>
+                        </div>
+
+                        {/* Optimized track */}
+                        <div className="flex items-center gap-2 mb-3">
+                            <span className="text-xs font-bold text-emerald-600 w-20 uppercase">Optimized</span>
+                            <div className="flex-1 relative h-2 bg-slate-100 rounded">
+                                <div
+                                    className="h-full bg-emerald-600 flex items-center justify-center"
+                                    style={{
+                                        marginLeft: "8%",
+                                        width: "25%",
+                                    }}
+                                >
+                                    <span className="text-xs font-bold text-emerald-600 absolute -top-4 left-1/2 -translate-x-1/2 whitespace-nowrap">
+                                        +{MOCK_RECEIPT.delayHours}h
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Hour axis */}
+                        <div className="flex justify-between text-xs text-slate-500 mt-4">
+                            <span>00:00</span>
+                            <span>06:00</span>
+                            <span>12:00</span>
+                            <span>18:00</span>
+                            <span>24:00</span>
+                        </div>
+                    </div>
+
+                    {/* CRYPTOGRAPHIC VERIFICATION */}
+                    <div className="bg-slate-50 border border-slate-200 rounded p-3 mb-4">
+                        <h3 className="text-xs font-bold text-slate-700 uppercase pb-2 mb-2 border-b border-slate-200">
+                            Cryptographic Verification
+                        </h3>
+                        <div className="space-y-2 text-xs">
+                            <div className="flex justify-between">
+                                <span className="text-slate-500 uppercase">Algorithm</span>
+                                <span className="font-bold text-slate-900 receipt-mono">{MOCK_RECEIPT.signature.algorithm}</span>
+                            </div>
+                            <div className="flex justify-between">
+                                <span className="text-slate-500 uppercase">Data Hash</span>
+                                <span className="font-bold text-slate-900 receipt-mono">{MOCK_RECEIPT.signature.hash}</span>
+                            </div>
+                            <div className="flex justify-between border-b border-slate-200 pb-2">
+                                <span className="text-slate-500 uppercase">Signature</span>
+                                <span className="font-bold text-slate-900 receipt-mono">{MOCK_RECEIPT.signature.id}</span>
+                            </div>
+                            <p className="text-slate-500 italic text-xs pt-1">
+                                Cryptographically signed and tamper-evident. Retain for Scope 3 emissions and audit submissions.
+                            </p>
+                        </div>
+                    </div>
+
+                    {/* FOOTER */}
+                    <div className="text-xs text-slate-500 border-t border-slate-200 pt-3 flex justify-between">
+                        <div>
+                            <p className="font-bold text-slate-700">Arboric Carbon Intelligence</p>
+                            <p className="text-emerald-600">arboric.xyz</p>
+                        </div>
+                        <div className="text-center">
+                            <p className="font-bold text-slate-700 uppercase">California SB 253 Scope 3</p>
+                            <p className="text-slate-500 text-xs">Certified Carbon Avoidance Receipt</p>
+                        </div>
+                        <div className="text-right">
+                            <p className="font-bold receipt-mono">Receipt #{MOCK_RECEIPT.receiptId}</p>
+                            <p>{MOCK_RECEIPT.generated}</p>
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        function App() {
+            return (
+                <div>
+                    <div className="bg-slate-900 text-white py-6 px-4 text-center">
+                        <h1 className="text-2xl font-bold">Certified Carbon Receipt Preview</h1>
+                        <p className="text-sm text-slate-300 mt-1">React/Tailwind mockup matching PDF design</p>
+                    </div>
+                    <ReceiptPreview />
+                </div>
+            );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById("root"));
+        root.render(<App />);
+    </script>
+</body>
+</html>

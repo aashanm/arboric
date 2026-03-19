@@ -6,6 +6,7 @@ for cost and carbon optimization. Built with Typer and Rich.
 """
 
 import time
+from datetime import datetime
 
 import typer
 from rich import box
@@ -25,12 +26,46 @@ from rich.text import Text
 
 from arboric.core.autopilot import Autopilot, OptimizationConfig
 from arboric.core.config import ArboricConfig, get_config
-from arboric.core.grid_oracle import MockGrid
+from arboric.core.grid_oracle import MockGrid, get_grid
 from arboric.core.history import HistoryStore
 from arboric.core.models import FleetOptimizationResult, Workload, WorkloadType
 
 # Initialize Rich console
 console = Console()
+
+
+def to_local_time(dt):
+    """Convert datetime to local timezone (if needed). Naive timestamps are assumed to already be in local time."""
+
+    import pandas as pd
+
+    # Handle pandas Timestamp
+    if isinstance(dt, pd.Timestamp):
+        dt_py = dt.to_pydatetime()
+        # If naive (from our forecast), it's already in local time - return as-is
+        if dt_py.tzinfo is None:
+            return dt_py
+        # If UTC-aware, convert to local
+        if str(dt_py.tzinfo) == "UTC":
+            return dt_py.astimezone()
+        # If already in a local timezone, return as-is
+        return dt_py
+
+    # Handle Python datetime
+    if dt.tzinfo is None:
+        # Naive timestamps from forecast are already in local time
+        return dt
+    if str(dt.tzinfo) == "UTC":
+        # UTC-aware, convert to local
+        return dt.astimezone()
+    # Already in some timezone, return as-is
+    return dt
+
+
+def format_local_time(dt, fmt: str = "%H:%M") -> str:
+    """Format datetime in local timezone."""
+    return to_local_time(dt).strftime(fmt)
+
 
 # Initialize Typer app
 app = typer.Typer(
@@ -86,8 +121,8 @@ def create_comparison_table(result) -> Table:
     # Start time
     table.add_row(
         "Start Time",
-        result.baseline_start.strftime("%H:%M"),
-        result.optimal_start.strftime("%H:%M"),
+        format_local_time(result.baseline_start),
+        format_local_time(result.optimal_start),
         f"+{result.delay_hours:.1f}h delay" if result.delay_hours > 0 else "Immediate",
     )
 
@@ -174,7 +209,8 @@ def create_forecast_chart(forecast_df, optimal_start, workload_duration) -> str:
     hour_labels = "  " + " " * 21
     for i in range(0, hours, 4):
         ts = forecast_df.index[i]
-        hour_labels += f"{ts.hour:02d}  "
+        local_hour = to_local_time(ts).hour
+        hour_labels += f"{local_hour:02d}  "
     lines.append(hour_labels + " (hour)")
 
     return "\n".join(lines)
@@ -223,6 +259,9 @@ def optimize(
         None, "--output", "-o", help="Output file path (or '-' for stdout)"
     ),
     format: str | None = typer.Option(None, "--format", "-f", help="Export format: json, csv"),
+    receipt: str | None = typer.Option(
+        None, "--receipt", help="Generate certified receipt PDF at path"
+    ),
 ):
     """
     Optimize a single workload for cost and carbon efficiency.
@@ -277,8 +316,22 @@ def optimize(
         console.print()
 
     # Get forecast and optimize
-    grid = MockGrid(region=region)
-    forecast = grid.get_forecast(hours=int(deadline) + int(duration) + 2)
+    grid = get_grid(region=region, config=cfg)
+    # Pass appropriate time based on grid type:
+    # - MockGrid expects naive local time for correct hour_of_day calculations
+    # - LiveGrid expects UTC time (interprets naive datetime as UTC)
+    from datetime import timezone as tz
+
+    now_local = datetime.now().replace(minute=0, second=0, microsecond=0)
+    if type(grid).__name__ == "LiveGrid":
+        # LiveGrid interprets naive datetime as UTC
+        now_for_forecast = now_local.astimezone(tz.utc).replace(tzinfo=None)
+    else:
+        # MockGrid expects naive local time
+        now_for_forecast = now_local
+    forecast = grid.get_forecast(
+        hours=int(deadline) + int(duration) + 2, start_time=now_for_forecast
+    )
 
     # Create autopilot with config-based optimization settings
     opt_config = OptimizationConfig(
@@ -290,13 +343,23 @@ def optimize(
     autopilot = Autopilot(config=opt_config)
     result = autopilot.optimize_schedule(workload, forecast)
 
+    # DEBUG: Print autopilot logs
+    if not quiet:
+        for log_entry in autopilot.get_log():
+            console.print(f"[dim]{log_entry}[/dim]")
+
     # Auto-record to history database
     if cfg.history.enabled:
         from pathlib import Path
 
-        store = HistoryStore(Path(cfg.history.db_path).expanduser())
-        data_source = "live" if type(grid).__name__ == "LiveGrid" else "mockgrid"
-        store.record(result, region=region, data_source=data_source)
+        try:
+            store = HistoryStore(Path(cfg.history.db_path).expanduser())
+            data_source = "live" if type(grid).__name__ == "LiveGrid" else "mockgrid"
+            store.record(result, region=region, data_source=data_source)
+        except Exception as e:
+            # Gracefully handle history db failures (e.g., in CI/GitHub Actions)
+            if not quiet:
+                console.print(f"[dim]Note: Could not record to history database: {e}[/dim]")
 
     # Handle export if requested
     if output:
@@ -334,6 +397,28 @@ def optimize(
             console.print(f"[{ARBORIC_RED}]Export failed: {e}[/{ARBORIC_RED}]")
             raise typer.Exit(1)
 
+    # Handle receipt generation if requested
+    if receipt:
+        try:
+            from pathlib import Path
+
+            from arboric.receipts import generate_receipt
+
+            carbon_receipt, pdf_bytes = generate_receipt(result, forecast, cfg)
+            Path(receipt).write_bytes(pdf_bytes)
+            console.print(
+                f"[{ARBORIC_GREEN}]✓ Receipt saved:[/] {receipt}  (ID: {carbon_receipt.receipt_id})"
+            )
+            console.print()
+        except ImportError:
+            console.print(
+                f"[{ARBORIC_RED}]⚠ Enterprise deps not installed. Run: pip install arboric[enterprise][/{ARBORIC_RED}]"
+            )
+            raise typer.Exit(1)
+        except Exception as e:
+            console.print(f"[{ARBORIC_RED}]Receipt generation failed: {e}[/{ARBORIC_RED}]")
+            raise typer.Exit(1)
+
     # Display events
     events = grid.detect_events(forecast)
     if events and not quiet:
@@ -348,7 +433,7 @@ def optimize(
     if result.delay_hours > 0:
         console.print(
             f"[bold {ARBORIC_GREEN}]Rerouting payload to "
-            f"{result.optimal_start.strftime('%H:%M')} "
+            f"{format_local_time(result.optimal_start)} "
             f"({result.delay_hours:.1f}h delay)[/bold {ARBORIC_GREEN}]"
         )
     else:
@@ -441,8 +526,20 @@ def tradeoff(
         simulate_optimization_animation(workload_name, duration=1.0)
         console.print()
 
-    grid = MockGrid(region=region)
-    forecast = grid.get_forecast(hours=int(deadline) + int(duration) + 2)
+    grid = get_grid(region=region, config=cfg)
+    # Pass appropriate time based on grid type:
+    # - MockGrid expects naive local time for correct hour_of_day calculations
+    # - LiveGrid expects UTC time (interprets naive datetime as UTC)
+    from datetime import timezone as tz
+
+    now_local = datetime.now().replace(minute=0, second=0, microsecond=0)
+    if type(grid).__name__ == "LiveGrid":
+        now_for_forecast = now_local.astimezone(tz.utc).replace(tzinfo=None)
+    else:
+        now_for_forecast = now_local
+    forecast = grid.get_forecast(
+        hours=int(deadline) + int(duration) + 2, start_time=now_for_forecast
+    )
 
     opt_config = OptimizationConfig(
         cost_weight=cfg.optimization.cost_weight,
@@ -481,7 +578,7 @@ def tradeoff(
 
         tradeoff_table.add_row(
             str(i),
-            point["start_time"].strftime("%H:%M"),
+            format_local_time(point["start_time"]),
             cost_display,
             f"{point['carbon']:.2f}",
             savings_display,
@@ -605,7 +702,6 @@ minimum cost and carbon emissions.
 
     # Initialize grid and autopilot
     # Start forecast at evening peak (18:00) to show optimizer finding cheaper morning windows
-    from datetime import datetime
 
     demo_start = datetime.now().replace(hour=18, minute=0, second=0, microsecond=0)
 
@@ -713,7 +809,7 @@ minimum cost and carbon emissions.
 
         results_table.add_row(
             r.workload.name[:27],
-            r.optimal_start.strftime("%H:%M"),
+            format_local_time(r.optimal_start),
             delay_str,
             cost_display,
             f"{r.carbon_savings_kg:.2f} kg",
@@ -826,8 +922,19 @@ def forecast(
     console.print(f"[bold]Fetching {hours}h forecast for {region}...[/bold]")
     console.print()
 
-    grid = MockGrid(region=region)
-    forecast_df = grid.get_forecast(hours=hours)
+    cfg = get_config()
+    grid = get_grid(region=region, config=cfg)
+    # Pass appropriate time based on grid type:
+    # - MockGrid expects naive local time for correct hour_of_day calculations
+    # - LiveGrid expects UTC time (interprets naive datetime as UTC)
+    from datetime import timezone as tz
+
+    now_local = datetime.now().replace(minute=0, second=0, microsecond=0)
+    if type(grid).__name__ == "LiveGrid":
+        now_for_forecast = now_local.astimezone(tz.utc).replace(tzinfo=None)
+    else:
+        now_for_forecast = now_local
+    forecast_df = grid.get_forecast(hours=hours, start_time=now_for_forecast)
 
     # Handle export if requested
     if output:
@@ -899,7 +1006,7 @@ def forecast(
         status = " ".join(status_parts) if status_parts else "─"
 
         table.add_row(
-            timestamp.strftime("%H:%M"),
+            format_local_time(timestamp),
             f"[{price_color}]${row['price']:.4f}[/{price_color}]",
             f"[{carbon_color}]{row['co2_intensity']:.0f} gCO₂[/{carbon_color}]",
             f"{row['renewable_percentage']:.0f}%",
@@ -924,10 +1031,10 @@ def forecast(
 
     console.print()
     console.print(
-        f"[bold {ARBORIC_GREEN}]Best price window:[/bold {ARBORIC_GREEN}] {best_price_idx.strftime('%H:%M')} (${forecast_df.loc[best_price_idx, 'price']:.4f}/kWh)"
+        f"[bold {ARBORIC_GREEN}]Best price window:[/bold {ARBORIC_GREEN}] {format_local_time(best_price_idx)} (${forecast_df.loc[best_price_idx, 'price']:.4f}/kWh)"
     )
     console.print(
-        f"[bold {ARBORIC_GREEN}]Greenest window:[/bold {ARBORIC_GREEN}] {best_carbon_idx.strftime('%H:%M')} ({forecast_df.loc[best_carbon_idx, 'co2_intensity']:.0f} gCO₂/kWh)"
+        f"[bold {ARBORIC_GREEN}]Greenest window:[/bold {ARBORIC_GREEN}] {format_local_time(best_carbon_idx)} ({forecast_df.loc[best_carbon_idx, 'co2_intensity']:.0f} gCO₂/kWh)"
     )
 
 
@@ -960,15 +1067,26 @@ def status():
         f"[{ARBORIC_GREEN}]● ONLINE[/{ARBORIC_GREEN}]",
         grid_details,
     )
+    # Format optimization weights as percentages
+    cost_pct = int(config.optimization.cost_weight * 100)
+    carbon_pct = int(config.optimization.carbon_weight * 100)
+
     status_table.add_row(
         "Autopilot Engine",
         f"[{ARBORIC_GREEN}]● READY[/{ARBORIC_GREEN}]",
-        "v1.0.0 | 60/40 cost/carbon weights",
+        f"v1.0.0 | {cost_pct}/{carbon_pct} cost/carbon weights",
     )
+
+    # Get supported regions from grid oracle
+    from arboric.core.grid_oracle import REGION_PROFILES
+
+    regions = ", ".join(sorted(REGION_PROFILES.keys()))
+    region_count = len(REGION_PROFILES)
+
     status_table.add_row(
         "Supported Regions",
-        f"[{ARBORIC_GREEN}]● 4 ACTIVE[/{ARBORIC_GREEN}]",
-        "US-WEST, US-EAST, EU-WEST, NORDIC",
+        f"[{ARBORIC_GREEN}]● {region_count} ACTIVE[/{ARBORIC_GREEN}]",
+        regions,
     )
     # Determine data sources
     data_sources = []
@@ -985,12 +1103,16 @@ def status():
         else f"[{ARBORIC_AMBER}]○ {data_source_text}[/{ARBORIC_AMBER}]"
     )
 
+    # Determine data source details
+    if "Live Data" in data_source_text:
+        data_details = "Live carbon + pricing"
+    else:
+        data_details = "Simulated grid data"
+
     status_table.add_row(
         "API Integration",
         api_status,
-        "Live carbon data + simulated pricing"
-        if "Live Data" in data_source_text
-        else "Simulated grid data",
+        data_details,
     )
 
     console.print(status_table)
