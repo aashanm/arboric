@@ -46,6 +46,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
   <style>
     body { background: #0a0a0a; color: #e5e5e5; }
     @keyframes draw { from { stroke-dashoffset: 2000; } to { stroke-dashoffset: 0; } }
@@ -682,18 +683,27 @@
               </div>
 
               {/* Trust strip */}
-              <div className="mt-12 flex flex-wrap gap-6 text-xs text-neutral-500">
-                <div className="flex items-center gap-2">
-                  <span className="w-1.5 h-1.5 rounded-full bg-green-500"/>
-                  <span>Multi-cloud orchestration</span>
+              <div className="mt-12 space-y-4">
+                <div className="flex flex-wrap gap-6 text-xs text-neutral-500">
+                  <div className="flex items-center gap-2">
+                    <span className="w-1.5 h-1.5 rounded-full bg-green-500"/>
+                    <span>Multi-cloud orchestration</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="w-1.5 h-1.5 rounded-full bg-green-500"/>
+                    <span>Cryptographically signed compliance</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="w-1.5 h-1.5 rounded-full bg-green-500"/>
+                    <span>SB 253 audit-ready</span>
+                  </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  <span className="w-1.5 h-1.5 rounded-full bg-green-500"/>
-                  <span>Cryptographically signed compliance</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="w-1.5 h-1.5 rounded-full bg-green-500"/>
-                  <span>SB 253 audit-ready</span>
+                {/* Cloud provider icons */}
+                <div className="flex items-center gap-4 pt-2">
+                  <span className="text-xs text-neutral-600">Works with:</span>
+                  <i className="fab fa-aws w-5 h-5 text-neutral-400 hover:text-orange-500 transition-colors text-lg" aria-label="AWS" title="Amazon AWS"></i>
+                  <i className="fab fa-microsoft w-5 h-5 text-neutral-400 hover:text-blue-500 transition-colors text-lg" aria-label="Microsoft Azure" title="Microsoft Azure"></i>
+                  <i className="fab fa-google w-5 h-5 text-neutral-400 hover:text-yellow-500 transition-colors text-lg" aria-label="Google Cloud" title="Google Cloud"></i>
                 </div>
               </div>
             </div>
@@ -1402,11 +1412,21 @@ annotations:
             {/* Cloud visual */}
             <div className={`mt-12 flex flex-col items-center ${vis ? 'anim-fade-up' : 'opacity-0'}`}>
               <div className="flex items-center justify-center gap-6 md:gap-12 flex-wrap">
-                {['AWS', 'Azure', 'GCP'].map(name => (
-                  <div key={name} className="w-20 h-20 rounded-xl bg-bg border border-border flex items-center justify-center text-neutral-500 text-sm font-mono">
-                    {name}
-                  </div>
-                ))}
+                {/* AWS */}
+                <div className="w-24 h-24 rounded-xl bg-bg border border-border hover:border-orange-500/50 flex flex-col items-center justify-center text-neutral-400 hover:text-orange-400 transition-all duration-300 group">
+                  <i className="fab fa-aws text-3xl mb-2"></i>
+                  <span className="text-xs font-mono font-semibold">AWS</span>
+                </div>
+                {/* Azure */}
+                <div className="w-24 h-24 rounded-xl bg-bg border border-border hover:border-blue-500/50 flex flex-col items-center justify-center text-neutral-400 hover:text-blue-400 transition-all duration-300 group">
+                  <i className="fab fa-microsoft text-3xl mb-2"></i>
+                  <span className="text-xs font-mono font-semibold">Azure</span>
+                </div>
+                {/* GCP */}
+                <div className="w-24 h-24 rounded-xl bg-bg border border-border hover:border-yellow-500/50 flex flex-col items-center justify-center text-neutral-400 hover:text-yellow-400 transition-all duration-300 group">
+                  <i className="fab fa-google text-3xl mb-2"></i>
+                  <span className="text-xs font-mono font-semibold">GCP</span>
+                </div>
               </div>
               <div className="my-4 flex flex-col items-center">
                 <svg width="2" height="40" aria-hidden="true"><line x1="1" y1="0" x2="1" y2="40" stroke="#22c55e" strokeWidth="2" strokeDasharray="4 4"/></svg>
