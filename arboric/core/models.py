@@ -108,13 +108,13 @@ class GridWindow(BaseModel):
     """
     Represents a single time window in the grid forecast.
 
-    Each window captures the carbon intensity and electricity price
+    Each window captures the carbon intensity and spot instance pricing
     at a specific point in time, enabling cost/carbon optimization.
     """
 
     timestamp: datetime = Field(..., description="Start time of this forecast window")
     co2_intensity: float = Field(..., ge=0, le=2000, description="Carbon intensity in gCO2/kWh")
-    price: float = Field(..., ge=0, le=10, description="Electricity price in $/kWh")
+    price: float = Field(..., ge=0, le=500, description="Cloud spot instance rate in $/hr")
     renewable_percentage: float = Field(
         default=0, ge=0, le=100, description="Percentage of renewable sources"
     )
@@ -128,8 +128,8 @@ class GridWindow(BaseModel):
 
     @property
     def is_cheap_window(self) -> bool:
-        """Returns True if this is a low-price window (< $0.08/kWh)."""
-        return self.price < 0.08
+        """Returns True if this is a low-price window (< $12.00/hr spot rate)."""
+        return self.price < 12.0
 
     @property
     def composite_score(self) -> float:
@@ -138,12 +138,14 @@ class GridWindow(BaseModel):
         Weighted: 60% price, 40% carbon.
         Normalized to 0-100 scale.
         """
-        price_normalized = min(self.price / 0.30, 1.0) * 100  # Normalize to $0.30 max
+        price_normalized = (
+            min(self.price / 25.0, 1.0) * 100
+        )  # Normalize to $25/hr on-demand ceiling
         carbon_normalized = min(self.co2_intensity / 800, 1.0) * 100  # Normalize to 800 gCO2 max
         return (price_normalized * 0.6) + (carbon_normalized * 0.4)
 
     def __str__(self) -> str:
-        return f"GridWindow({self.timestamp.strftime('%H:%M')}: ${self.price:.3f}/kWh, {self.co2_intensity:.0f}gCO2)"
+        return f"GridWindow({self.timestamp.strftime('%H:%M')}: ${self.price:.2f}/hr, {self.co2_intensity:.0f}gCO2)"
 
 
 class ScheduleResult(BaseModel):

@@ -37,11 +37,15 @@ async def get_status(config: ArboricConfig = Depends(get_arboric_config)):
     data_sources = []
 
     if live_data_config.enabled and live_data_config.api_key:
-        data_sources.append("live-data")
+        data_sources.append("live-carbon-pricing")
     if not data_sources:
-        data_sources.append("mockgrid")
+        data_sources.append("simulated-spot-pricing")
 
-    grid_type = "LiveGrid" if live_data_config.enabled else "MockGrid"
+    # Use generic type descriptions instead of implementation class names
+    grid_type = "live" if live_data_config.enabled else "simulation"
+    grid_description = (
+        "Live Data (Carbon + Pricing)" if live_data_config.enabled else "Simulated Data"
+    )
 
     data = {
         "service": {
@@ -54,6 +58,7 @@ async def get_status(config: ArboricConfig = Depends(get_arboric_config)):
             "grid_oracle": {
                 "status": "online",
                 "type": grid_type,
+                "description": grid_description,
                 "mode": grid_mode,
                 "data_sources": data_sources,
             },
