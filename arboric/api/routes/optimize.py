@@ -41,7 +41,12 @@ async def optimize_workload(
     """
     try:
         # Get grid forecast
-        grid = get_grid(region=request.region, config=get_config())
+        grid = get_grid(
+            region=request.region,
+            config=get_config(),
+            instance_type=request.workload.instance_type,
+            cloud_provider=request.workload.cloud_provider,
+        )
         forecast_hours = request.forecast_hours or 48
         # Pass appropriate time based on grid type
         now_local = datetime.now().replace(minute=0, second=0, microsecond=0)

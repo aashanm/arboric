@@ -160,13 +160,28 @@ def create_comparison_table(result) -> Table:
         f"-{result.carbon_savings_kg:.2f} kg",
     )
 
+    # On-demand rate (if instance was specified)
+    if result.on_demand_rate_per_hr is not None:
+        table.add_row(
+            "On-demand Rate",
+            f"${result.on_demand_rate_per_hr:.2f}/hr",
+            f"${result.on_demand_rate_per_hr:.2f}/hr",
+            "(reference)",
+        )
+
     table.add_section()
 
     # UX note: explain the cost/carbon decoupling
+    note_text = "[dim]Cost reflects spot rate × duration. Carbon reflects power × duration × grid intensity."
+    if result.cost_constrained:
+        note_text += " ⚠️ Cost constraint applied: composite score recommended a more expensive window, so minimum-cost window selected instead.[/dim]"
+    else:
+        note_text += "[/dim]"
+
     table.add_row(
         "[dim]Note[/dim]",
         "",
-        "[dim]Cost reflects spot rate × duration. Carbon reflects power × duration × grid intensity.[/dim]",
+        note_text,
         "",
     )
 
@@ -264,6 +279,15 @@ def optimize(
     ),
     power: float | None = typer.Option(None, "--power", "-p", help="Power draw in kW"),
     region: str | None = typer.Option(None, "--region", "-r", help="Grid region"),
+    instance_type: str | None = typer.Option(
+        None,
+        "--instance-type",
+        "-i",
+        help="Cloud instance type (e.g., p3.8xlarge). Use with --provider.",
+    ),
+    cloud_provider: str | None = typer.Option(
+        None, "--provider", help="Cloud provider: aws, gcp, or azure. Use with --instance-type."
+    ),
     quiet: bool = typer.Option(False, "--quiet", "-q", help="Minimal output"),
     output: str | None = typer.Option(
         None, "--output", "-o", help="Output file path (or '-' for stdout)"
@@ -290,6 +314,8 @@ def optimize(
     deadline = deadline if deadline is not None else cfg.defaults.deadline_hours
     power = power if power is not None else cfg.defaults.power_draw_kw
     region = region if region is not None else cfg.defaults.region
+    instance_type = instance_type if instance_type is not None else cfg.defaults.instance_type
+    cloud_provider = cloud_provider if cloud_provider is not None else cfg.defaults.cloud_provider
     quiet = quiet or cfg.cli.quiet_mode
 
     if not quiet and cfg.cli.show_banner:
@@ -303,16 +329,34 @@ def optimize(
         power_draw_kw=power,
         deadline_hours=deadline,
         workload_type=WorkloadType.ML_TRAINING,
+        instance_type=instance_type,
+        cloud_provider=cloud_provider,
     )
 
     # Display workload info
+    instance_info = ""
+    if workload.instance_type:
+        from arboric.core.grid_oracle import INSTANCE_PROFILES
+
+        provider_profiles = INSTANCE_PROFILES.get(workload.cloud_provider, {})
+        instance_profile = provider_profiles.get(workload.instance_type)
+        if instance_profile:
+            instance_info = f"""[bold]Instance:[/bold] {workload.instance_type} ({workload.cloud_provider.upper()}) · {instance_profile['gpu']} · {instance_profile['use_case']}
+[bold]On-demand:[/bold] ${instance_profile['on_demand']:.2f}/hr
+"""
+        else:
+            instance_info = f"[bold]Instance:[/bold] {workload.instance_type} ({workload.cloud_provider.upper()})\n"
+    else:
+        instance_info = "[bold]Instance:[/bold] Not specified (using default GPU profile)\n"
+
     workload_panel = Panel(
         f"""[bold]Workload:[/bold] {workload.name}
 [bold]Duration:[/bold] {workload.duration_hours}h
 [bold]Power Draw:[/bold] {workload.power_draw_kw} kW
 [bold]Energy:[/bold] {workload.energy_kwh} kWh
 [bold]Deadline:[/bold] {workload.deadline_hours}h from now
-[bold]Region:[/bold] {region}""",
+[bold]Region:[/bold] {region}
+{instance_info}""",
         title="[bold white]Payload Configuration",
         border_style=ARBORIC_PURPLE,
         padding=(1, 2),
@@ -326,7 +370,12 @@ def optimize(
         console.print()
 
     # Get forecast and optimize
-    grid = get_grid(region=region, config=cfg)
+    grid = get_grid(
+        region=region,
+        config=cfg,
+        instance_type=instance_type,
+        cloud_provider=cloud_provider,
+    )
     # Pass appropriate time based on grid type:
     # - MockGrid expects naive local time for correct hour_of_day calculations
     # - LiveGrid expects UTC time (interprets naive datetime as UTC)
@@ -485,6 +534,15 @@ def tradeoff(
     ),
     power: float | None = typer.Option(None, "--power", "-p", help="Power draw in kW"),
     region: str | None = typer.Option(None, "--region", "-r", help="Grid region"),
+    instance_type: str | None = typer.Option(
+        None,
+        "--instance-type",
+        "-i",
+        help="Cloud instance type (e.g., p3.8xlarge). Use with --provider.",
+    ),
+    cloud_provider: str | None = typer.Option(
+        None, "--provider", help="Cloud provider: aws, gcp, or azure. Use with --instance-type."
+    ),
     points: int = typer.Option(10, "--points", "-n", help="Number of tradeoff points to show"),
     quiet: bool = typer.Option(False, "--quiet", "-q", help="Minimal output"),
 ):
@@ -504,6 +562,8 @@ def tradeoff(
     deadline = deadline if deadline is not None else cfg.defaults.deadline_hours
     power = power if power is not None else cfg.defaults.power_draw_kw
     region = region if region is not None else cfg.defaults.region
+    instance_type = instance_type if instance_type is not None else cfg.defaults.instance_type
+    cloud_provider = cloud_provider if cloud_provider is not None else cfg.defaults.cloud_provider
     quiet = quiet or cfg.cli.quiet_mode
 
     if not quiet and cfg.cli.show_banner:
@@ -516,6 +576,8 @@ def tradeoff(
         power_draw_kw=power,
         deadline_hours=deadline,
         workload_type=WorkloadType.ML_TRAINING,
+        instance_type=instance_type,
+        cloud_provider=cloud_provider,
     )
 
     workload_panel = Panel(
@@ -536,7 +598,12 @@ def tradeoff(
         simulate_optimization_animation(workload_name, duration=1.0)
         console.print()
 
-    grid = get_grid(region=region, config=cfg)
+    grid = get_grid(
+        region=region,
+        config=cfg,
+        instance_type=instance_type,
+        cloud_provider=cloud_provider,
+    )
     # Pass appropriate time based on grid type:
     # - MockGrid expects naive local time for correct hour_of_day calculations
     # - LiveGrid expects UTC time (interprets naive datetime as UTC)

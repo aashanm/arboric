@@ -30,7 +30,8 @@ DEFAULT_CARBON_WEIGHT = 0.3
 
 # Normalization ceiling for spot instance pricing
 # Represents a "bad" spot price equivalent to on-demand rate
-SPOT_PRICE_NORMALIZATION_CEILING = 25.0  # $/hr
+# Raised to 35.0 to cover highest-tier GPU on-demand (p4d.24xlarge: $32.77/hr)
+SPOT_PRICE_NORMALIZATION_CEILING = 35.0  # $/hr
 
 
 class OptimizationConfig:
@@ -196,6 +197,7 @@ class Autopilot:
                 baseline_carbon_kg=baseline_carbon,
                 baseline_avg_price=baseline_slice["price"].mean(),
                 baseline_avg_carbon=baseline_slice["co2_intensity"].mean(),
+                cost_constrained=False,
             )
 
         # Calculate baseline (immediate start)
@@ -248,17 +250,53 @@ class Autopilot:
                 best_cost = cost
                 best_carbon = carbon
 
+        # Check cost constraint: optimized cost must not exceed baseline cost
+        cost_constrained = False
+        if best_cost > baseline_cost:
+            self._log(
+                f"⚠️  Cost constraint violated: composite score recommended "
+                f"${best_cost:.2f} (higher than baseline ${baseline_cost:.2f})"
+            )
+            self._log("Falling back to minimum-cost window...")
+
+            # Find window with minimum cost (ignoring composite score)
+            min_cost_idx = 0
+            min_cost = baseline_cost
+            min_cost_carbon = baseline_carbon
+
+            for start_idx, score, cost, carbon in scores_by_hour:
+                if cost < min_cost:
+                    min_cost = cost
+                    min_cost_idx = start_idx
+                    min_cost_carbon = carbon
+
+            best_start_idx = min_cost_idx
+            best_cost = min_cost
+            best_carbon = min_cost_carbon
+            cost_constrained = True
+
+            self._log(
+                f"Cost constraint fallback: ${best_cost:.2f} (${baseline_cost - best_cost:.2f} savings)"
+            )
+
         # Find optimal window details
         optimal_start = forecast_df.index[best_start_idx]
         optimal_end = optimal_start + timedelta(hours=workload.duration_hours)
         optimal_slice = forecast_df.iloc[best_start_idx : best_start_idx + windows_needed]
 
         self._log(f"Optimal start: {optimal_start.strftime('%Y-%m-%d %H:%M')}")
-        self._log(f"Optimal score: {best_score:.2f} (${best_cost:.2f}, {best_carbon:.2f}kg CO2)")
+        self._log(f"Optimal cost: ${best_cost:.2f}, carbon: {best_carbon:.2f}kg CO2")
 
         if best_start_idx > 0:
             delay_hours = (optimal_start - baseline_start).total_seconds() / 3600
             self._log(f"Delaying workload by {delay_hours:.1f} hours for optimization")
+
+        # Extract on-demand rate if instance was specified
+        on_demand_rate = (
+            forecast_df["on_demand_rate"].iloc[0]
+            if "on_demand_rate" in forecast_df.columns
+            else None
+        )
 
         return ScheduleResult(
             workload=workload,
@@ -274,6 +312,8 @@ class Autopilot:
             baseline_carbon_kg=baseline_carbon,
             baseline_avg_price=baseline_avg_price,
             baseline_avg_carbon=baseline_avg_carbon,
+            on_demand_rate_per_hr=on_demand_rate,
+            cost_constrained=cost_constrained,
         )
 
     def optimize_fleet(

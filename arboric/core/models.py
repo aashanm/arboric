@@ -9,7 +9,9 @@ from datetime import datetime
 from enum import Enum
 from uuid import UUID, uuid4
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
+
+VALID_CLOUD_PROVIDERS = frozenset({"aws", "gcp", "azure"})
 
 
 class WorkloadPriority(str, Enum):
@@ -86,6 +88,18 @@ class Workload(BaseModel):
     dependencies: list["WorkloadDependency"] = Field(
         default=[], description="List of prerequisite workloads that must complete first"
     )
+    instance_type: str | None = Field(
+        default=None,
+        description=(
+            "Cloud instance type for spot pricing. "
+            "Examples: 'p3.8xlarge' (AWS), 'a2-highgpu-4g' (GCP), 'Standard_NC24s_v3' (Azure). "
+            "Must be provided together with cloud_provider."
+        ),
+    )
+    cloud_provider: str | None = Field(
+        default=None,
+        description="Cloud provider: 'aws', 'gcp', or 'azure'. Must be provided with instance_type.",
+    )
 
     @field_validator("deadline_hours")
     @classmethod
@@ -95,13 +109,32 @@ class Workload(BaseModel):
             raise ValueError("deadline_hours must be >= duration_hours")
         return v
 
+    @model_validator(mode="after")
+    def validate_instance_fields(self) -> "Workload":
+        """Ensure instance_type and cloud_provider are either both set or both None."""
+        has_type = self.instance_type is not None
+        has_provider = self.cloud_provider is not None
+        if has_type != has_provider:
+            raise ValueError("instance_type and cloud_provider must both be set or both be None.")
+        if has_provider:
+            normalized = self.cloud_provider.lower()
+            if normalized not in VALID_CLOUD_PROVIDERS:
+                raise ValueError(
+                    f"cloud_provider must be one of {sorted(VALID_CLOUD_PROVIDERS)}, got {self.cloud_provider!r}"
+                )
+            object.__setattr__(self, "cloud_provider", normalized)
+        return self
+
     @property
     def energy_kwh(self) -> float:
         """Total energy consumption for the workload."""
         return self.power_draw_kw * self.duration_hours
 
     def __str__(self) -> str:
-        return f"Workload({self.name}, {self.duration_hours}h @ {self.power_draw_kw}kW)"
+        result = f"Workload({self.name}, {self.duration_hours}h @ {self.power_draw_kw}kW)"
+        if self.instance_type:
+            result += f" [{self.instance_type} ({self.cloud_provider.upper()})]"
+        return result
 
 
 class GridWindow(BaseModel):
@@ -176,6 +209,18 @@ class ScheduleResult(BaseModel):
     baseline_avg_price: float = Field(..., ge=0, description="Average price during baseline window")
     baseline_avg_carbon: float = Field(
         ..., ge=0, description="Average carbon during baseline window"
+    )
+
+    # Instance pricing metadata
+    on_demand_rate_per_hr: float | None = Field(
+        default=None,
+        description="On-demand rate for the scheduled instance type ($/hr), if instance was specified.",
+    )
+
+    # Constraint enforcement flag
+    cost_constrained: bool = Field(
+        default=False,
+        description="True if cost constraint was applied (composite score recommended a more expensive window, so minimum-cost window was selected instead).",
     )
 
     @property

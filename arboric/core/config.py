@@ -46,6 +46,12 @@ class DefaultWorkloadSettings(BaseModel):
     power_draw_kw: float = Field(default=50.0, gt=0, description="Default power draw in kW")
     deadline_hours: float = Field(default=12.0, gt=0, description="Default deadline in hours")
     region: str = Field(default="US-WEST", description="Default grid region")
+    instance_type: str | None = Field(
+        default=None, description="Default cloud instance type (e.g. p3.8xlarge)"
+    )
+    cloud_provider: str | None = Field(
+        default=None, description="Default cloud provider (aws, gcp, or azure)"
+    )
 
 
 class LiveDataSettings(BaseModel):
