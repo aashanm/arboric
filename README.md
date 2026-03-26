@@ -430,4 +430,4 @@ Arboric is released under the [MIT License](LICENSE).
 - **Package:** [PyPI Listing](https://pypi.org/project/arboric/)
 - **Questions?** Open an issue on [GitHub](https://github.com/aashanm/arboric)
 - **Want to contribute?** PRs welcome.
-- **Feedback?** Reach out to aashan5050@gmail.com or solapuramaparna2000@gmail.com.
+- **Feedback?** Reach out to am@arboric.xyz or arr@arboric.xyz.
