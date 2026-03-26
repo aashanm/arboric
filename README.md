@@ -10,15 +10,15 @@
 
 ## The Problem
 
-AI teams spend millions on compute. Most of that cost is arbitrary - determined by *when* jobs run, not *what* they do. Peak pricing is 10-15x cheaper during solar hours, and grid carbon varies by 5x hour-to-hour. Yet nearly every workload runs immediately.
+AI teams spend millions on compute. Most of that cost is arbitrary - determined by *when* jobs run, not *what* they do. Spot and on-demand pricing fluctuate significantly across hours — windows that correlate with grid conditions. Carbon intensity varies substantially hour-to-hour. Yet nearly every workload runs immediately at peak cost.
 
-Compliance is moving faster. SB 253 (California's Scope 3 deadline) is **January 2027**. Most cloud platforms can't prove workload carbon - they need scheduling intelligence.
+Compliance is moving faster. [SB 253 (California's Scope 3 deadline)](https://leginfo.legislature.ca.gov/faces/billTextClient.xhtml?bill_id=202320SB253) is **January 2027**. Most cloud platforms can't prove workload carbon - they need scheduling intelligence.
 
 ## The Solution
 
-Arboric learns your grid's duck curve and automatically delays flexible workloads to cheaper, cleaner windows. An algorithm running on your own infrastructure (or ours).
+Arboric monitors spot instance pricing and marginal emissions rates independently, then automatically delays flexible workloads to the lowest-cost, lowest-carbon execution window within your deadline. An algorithm running on your own infrastructure (or ours).
 
-- **Estimated 30-60% cost reduction** on flexible workloads (real metrics, not projections)
+- **Cost reduction** on flexible workloads (real metrics, not projections)
 - **Scope 3 compliance** with audit trail showing carbon-aware decisions
 - **Zero code changes** — works with any orchestration layer (Airflow, Kubernetes, serverless, etc.)
 - **Deploy in hours** — single binary + REST API
@@ -62,8 +62,8 @@ arboric tradeoff "ETL" --duration 2 --power 40 --region US-WEST
 ├────────────────────────────────────────────────────────────┤
 │  Run Immediately      vs    Delay to 1:00 PM               │
 ├────────────────────────────────────────────────────────────┤
-│  Cost        $109.66              $64.09   (41.5% cheaper) │
-│  Carbon      328 kg               135 kg   (59% cleaner)   │
+│  Cost        $109.66              $64.09                   │
+│  Carbon      328 kg               135 kg                   │
 │  Deadline    OK ✓                 OK ✓                     │
 ├────────────────────────────────────────────────────────────┤
 │  Recommendation: Delay 4 hours                             │
@@ -221,8 +221,8 @@ arboric optimize "Training Job" --receipt report.pdf
 ```
 
 Includes:
-- **MOER data** — Real carbon intensity from WattTime
-- **Pricing snapshot** — Actual $/kWh paid or avoided
+- **Carbon intensity data** — Real-time marginal emissions rate from an external emissions provider
+- **Compute cost snapshot** — Estimated savings from optimal scheduling vs. immediate execution
 - **Execution details** — Job start time, duration, power, region
 - **Savings proof** — Cost + carbon savings with supporting numbers
 - **Audit signature** — Cryptographic hash for tamper detection
@@ -238,20 +238,22 @@ Arboric doesn't predict the future or use ML. It uses real grid data (or realist
 
 **The Algorithm**
 
-1. **Load grid forecast** — Get 48-hour prices + carbon intensity for your region
+1. **Load grid forecast** — Get 48-hour compute pricing signals + carbon intensity for your region
 2. **Find all feasible windows** — Scan every possible start time that meets your deadline
-3. **Score each window** — Calculate cost × (70%) + carbon × (30%), normalized
+3. **Score each window** — Calculate estimated compute cost × (70%) + carbon × (30%), normalized
 4. **Pick the best** — Return the schedule that minimizes your composite score
-5. **Calculate savings** — Show cost $/kg CO₂ saved vs. running now
+5. **Calculate savings** — Show estimated compute cost $/kg CO₂ saved vs. running now
 
 All of this runs in <100ms per workload. No external calls (unless you enable live grid data).
 
 **Real Example**
 
+_Cost signal: normalized regional compute pricing index. Carbon: grid intensity g/kWh._
+
 ```
 Grid (US-WEST, 6-hour job, 120 kW)
 
-Hour    Price    Carbon    Score
+Hour    Cost Signal    Carbon    Score
 08:00   $0.150   420 g     67.2  ← running now
 09:00   $0.145   410 g     64.5
 10:00   $0.120   350 g     50.1
@@ -260,8 +262,8 @@ Hour    Price    Carbon    Score
 13:00   $0.088   190 g     30.5
 
 Result: Delay 4 hours
-  • Cost: $110.66 → $61.20 (save $49.46, 44.6%)
-  • Carbon: 350 kg → 140 kg (avoid 210 kg, 60%)
+  • Cost: $110.66 → $61.20 (save $49.46)
+  • Carbon: 350 kg → 140 kg (avoid 210 kg)
   • Deadline: 24h available, job uses 6h ✓
 ```
 
@@ -406,7 +408,7 @@ ruff format arboric
 
 **Market Timing**
 - **SB 253** (Scope 3 reporting): Jan 2027 deadline. AI/cloud companies need provable carbon-aware scheduling to report compliance.
-- **Cost pressure**: Generative AI training budgets are huge. Every 1% cost reduction = millions saved. Grid arbitrage is a proven lever.
+- **Cost pressure**: AI training budgets are huge. Every 1% cost reduction = millions saved. Cloud cost arbitrage is a proven lever.
 - **Grid data availability**: Real-time carbon/price APIs make this possible at scale.
 
 **Why We Win**
