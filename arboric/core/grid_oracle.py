@@ -1,11 +1,13 @@
 """
 Arboric Grid Oracle
 
-Simulation engine for electricity grid forecasting.
-Generates realistic synthetic data modeling regional grid patterns including:
-- Solar generation patterns (duck curve effect)
-- Time-of-use pricing variations
-- Carbon intensity fluctuations
+Simulation engine for cloud compute forecasting.
+Generates realistic synthetic data modeling regional spot pricing and carbon patterns:
+- Cloud spot instance pricing (driven by capacity contention)
+- Carbon intensity fluctuations (duck curve effect from solar generation)
+
+Note: These signals are independent. Carbon is based on grid electricity generation mix,
+while spot prices are based on spare cloud capacity (business-hours peaks).
 
 For real-time grid data (live APIs), install: pip install arboric[cloud]
 This package provides MockGrid simulation; live integrations are available separately.
@@ -19,42 +21,50 @@ import pandas as pd
 
 from arboric.core.models import GridWindow
 
-# Regional grid profiles (baseline characteristics)
+# Regional profiles (carbon patterns + cloud spot pricing)
+# Carbon fields: model electricity grid generation mix (solar duck curve, evening peaker ramps)
+# Pricing fields: model cloud spot instance rates (business-hours capacity contention)
 REGION_PROFILES = {
     "US-WEST": {
+        # Carbon (unchanged from original - still models grid generation mix)
         "base_carbon": 350,  # gCO2/kWh
-        "carbon_amplitude": 200,  # Swing from solar
-        "base_price": 0.12,  # $/kWh
-        "price_amplitude": 0.08,
-        "solar_peak_hour": 13,  # 1 PM
-        "price_peak_hour": 18,  # 6 PM (evening ramp)
+        "carbon_amplitude": 200,  # Swing from solar duck curve
+        "solar_peak_hour": 13,  # 1 PM peak solar generation
+        # Spot pricing (replaces electricity TOU model)
+        "on_demand_rate_per_hr": 24.00,  # Reference GPU on-demand rate ($/hr)
+        "spot_floor_discount": 0.58,  # 58% off = $10.08/hr floor (overnight cheap)
+        "spot_peak_discount": 0.25,  # 25% off = $18.00/hr peak (business hours)
+        "contention_peak_hour": 17,  # 5 PM PT - peak cloud usage (end of business day)
         "timezone_offset": -8,
     },
     "US-EAST": {
         "base_carbon": 420,
         "carbon_amplitude": 150,
-        "base_price": 0.14,
-        "price_amplitude": 0.07,
         "solar_peak_hour": 13,
-        "price_peak_hour": 17,
+        "on_demand_rate_per_hr": 22.00,
+        "spot_floor_discount": 0.55,  # → floor=$9.90/hr, peak=$17.60/hr
+        "spot_peak_discount": 0.20,
+        "contention_peak_hour": 16,  # 4 PM ET - peak cloud usage
         "timezone_offset": -5,
     },
     "EU-WEST": {
         "base_carbon": 280,
         "carbon_amplitude": 180,
-        "base_price": 0.18,
-        "price_amplitude": 0.10,
         "solar_peak_hour": 14,
-        "price_peak_hour": 19,
+        "on_demand_rate_per_hr": 20.00,
+        "spot_floor_discount": 0.50,  # → floor=$10.00/hr, peak=$17.00/hr
+        "spot_peak_discount": 0.15,
+        "contention_peak_hour": 15,  # 3 PM CET - peak cloud usage
         "timezone_offset": 1,
     },
     "NORDIC": {
         "base_carbon": 80,  # Hydro-dominated
         "carbon_amplitude": 40,
-        "base_price": 0.08,
-        "price_amplitude": 0.04,
         "solar_peak_hour": 13,
-        "price_peak_hour": 18,
+        "on_demand_rate_per_hr": 18.00,
+        "spot_floor_discount": 0.60,  # → floor=$7.20/hr, peak=$12.60/hr
+        "spot_peak_discount": 0.30,
+        "contention_peak_hour": 14,  # 2 PM CET - peak cloud usage
         "timezone_offset": 1,
     },
 }
@@ -62,14 +72,14 @@ REGION_PROFILES = {
 
 class MockGrid:
     """
-    Simulates realistic electricity grid behavior.
+    Simulates cloud compute forecasts with spot pricing and carbon intensity.
 
-    Models two key phenomena:
-    1. The "Duck Curve" - Midday solar depression in carbon intensity
-    2. TOU Pricing - Evening peak pricing from demand surge
+    Models two INDEPENDENT phenomena:
+    1. Carbon Intensity (Duck Curve) - Solar generation suppresses grid carbon 11am-3pm
+    2. Spot Pricing (Business Hours) - Cloud capacity contention peaks 9am-6pm (driven by job queuing, not solar)
 
-    The simulation uses overlapping sine waves with randomization
-    to produce realistic, varied forecasts for demo purposes.
+    These signals are uncorrelated by design: sometimes the cheapest spot window overlaps with
+    the greenest carbon window, sometimes they don't. This tension creates the scheduling tradeoff.
     """
 
     def __init__(self, region: str = "US-WEST", seed: int | None = None):
@@ -164,51 +174,50 @@ class MockGrid:
 
     def _calculate_price(self, hour: float) -> float:
         """
-        Calculate electricity price for a given hour.
+        Calculate cloud spot instance price for a given hour.
 
-        Models wholesale electricity pricing with STRONG solar correlation:
-        - Solar Peak (11am-3pm): LOWEST prices due to oversupply
-        - Evening Peak (5pm-9pm): HIGHEST prices (demand + no solar)
-        - Night: Moderate prices
+        Models capacity contention pricing (NOT electricity wholesale pricing):
+        - Off-Peak (10pm-6am): LOWEST prices, spare cloud capacity → floor discount
+        - Business Hours (9am-6pm): HIGHEST prices, peak job queuing → minimal discount
+        - Ramp-up (6am-9am): Linear transition from floor to peak
+        - Evening Decay (6pm-10pm): Fall-back from peak toward floor
 
-        Key insight: In high-solar regions, midday solar generation often creates
-        lower wholesale prices. This aligns carbon and cost optimization!
+        Key insight: Spot prices driven by spare cloud capacity and job queue length,
+        completely independent from grid carbon (which depends on solar/peaker plants).
         """
-        base = self.profile["base_price"]
-        amplitude = self.profile["price_amplitude"]
+        on_demand = self.profile["on_demand_rate_per_hr"]
+        floor_price = on_demand * (1 - self.profile["spot_floor_discount"])
+        peak_price = on_demand * (1 - self.profile["spot_peak_discount"])
+        price_range = peak_price - floor_price
 
-        # Solar suppression - SAME factor as carbon, creating correlation
-        # During solar peak, prices drop significantly due to oversupply
-        solar_factor = self._calculate_solar_factor(hour)
-        solar_price_reduction = amplitude * 1.5 * solar_factor  # Strong price drop
+        contention_peak = self.profile["contention_peak_hour"]
+        contention_width = 5.0  # Gaussian width in hours (wider peak, extends further)
 
-        # Evening demand spike (5pm-9pm) - highest prices
-        evening_peak = 18.5
-        evening_width = 2.0
+        # Business-hours contention spike (9am-6pm, Gaussian centered at peak hour)
+        # Gaussian extends naturally beyond boundaries, so we apply it to all hours
+        # but the formula naturally decreases outside the main window
+        distance = abs(hour - contention_peak)
+        contention_component = price_range * math.exp(-(distance**2) / (2 * contention_width**2))
+
+        # Morning ramp-up (6am-9am, linear)
+        ramp_component = 0
+        if 6 <= hour < 9:
+            ramp_fraction = (hour - 6) / 3.0
+            ramp_component = price_range * 0.35 * ramp_fraction
+
+        # Evening decay (6pm-10pm, linear fall-off)
         evening_component = 0
-        if 15 <= hour <= 22:
-            evening_distance = abs(hour - evening_peak)
-            evening_component = (
-                amplitude * 1.2 * math.exp(-(evening_distance**2) / (2 * evening_width**2))
-            )
+        if 18 < hour <= 22:
+            decay_fraction = (hour - 18) / 4.0
+            evening_component = price_range * 0.4 * (1 - decay_fraction)
 
-        # Night baseline (moderate - neither peak nor solar)
-        night_component = 0
-        if hour < 6 or hour > 22:
-            night_component = amplitude * 0.3
+        # Random market noise (~1% of on-demand rate)
+        noise = self._random.gauss(0, on_demand * 0.01)
 
-        # Random market noise (reduced for predictable demo)
-        noise = self._random.gauss(0, 0.005)
+        price = floor_price + contention_component + ramp_component + evening_component + noise
 
-        price = (
-            base
-            - solar_price_reduction
-            + evening_component
-            + night_component
-            + self._daily_price_shift
-            + noise
-        )
-        return max(0.02, min(0.50, price))  # Clamp to realistic range
+        # Clamp: allow slight undercut below floor due to noise, never exceed on-demand
+        return max(floor_price * 0.85, min(on_demand, price))
 
     def _calculate_renewable_percentage(self, hour: float) -> float:
         """Calculate renewable energy percentage based on solar/wind patterns."""
@@ -261,10 +270,20 @@ class MockGrid:
             co2 = self._calculate_carbon_intensity(hour_of_day) * trend_factor
             price = self._calculate_price(hour_of_day) * trend_factor
 
+            # Clamp price using dynamic bounds based on region profile
+            floor = (
+                self.profile["on_demand_rate_per_hr"]
+                * (1 - self.profile["spot_floor_discount"])
+                * 0.85
+            )
+            ceiling = self.profile["on_demand_rate_per_hr"]
+
             window = GridWindow(
                 timestamp=timestamp,
                 co2_intensity=max(50, min(800, co2)),  # Re-clamp after trend factor
-                price=max(0.02, min(0.50, price)),  # Re-clamp after trend factor
+                price=max(
+                    floor, min(ceiling, price)
+                ),  # Re-clamp after trend factor, using spot price bounds
                 renewable_percentage=self._calculate_renewable_percentage(hour_of_day),
                 region=self.region,
                 confidence=max(0.5, 1.0 - (i / intervals) * 0.3),  # Confidence decreases with time
@@ -313,16 +332,19 @@ class MockGrid:
                 }
             )
 
-        # Detect price spikes
-        price_threshold = self.profile["base_price"] + self.profile["price_amplitude"] * 0.8
-        high_price_periods = forecast_df[forecast_df["price"] > price_threshold]
+        # Detect spot price spikes (10% above nominal peak contention rate)
+        peak_price = self.profile["on_demand_rate_per_hr"] * (
+            1 - self.profile["spot_peak_discount"]
+        )
+        spike_threshold = peak_price * 1.10
+        high_price_periods = forecast_df[forecast_df["price"] > spike_threshold]
         if not high_price_periods.empty:
             events.append(
                 {
                     "type": "PRICE_SPIKE",
                     "severity": "warning",
                     "start": high_price_periods.index[0],
-                    "description": f"Price spike expected (${high_price_periods['price'].max():.3f}/kWh)",
+                    "description": f"Spot price spike expected (${high_price_periods['price'].max():.2f}/hr)",
                 }
             )
 
@@ -339,8 +361,11 @@ class MockGrid:
                 }
             )
 
-        # Detect cheap windows
-        cheap_threshold = self.profile["base_price"] - self.profile["price_amplitude"] * 0.5
+        # Detect cheap windows (within 15% above floor = genuine buying opportunity)
+        floor_price = self.profile["on_demand_rate_per_hr"] * (
+            1 - self.profile["spot_floor_discount"]
+        )
+        cheap_threshold = floor_price * 1.15
         cheap_periods = forecast_df[forecast_df["price"] < cheap_threshold]
         if not cheap_periods.empty:
             events.append(
@@ -348,7 +373,7 @@ class MockGrid:
                     "type": "LOW_PRICE",
                     "severity": "opportunity",
                     "start": cheap_periods.index[0],
-                    "description": f"Low-price window available (${cheap_periods['price'].min():.3f}/kWh)",
+                    "description": f"Low spot price window available (${cheap_periods['price'].min():.2f}/hr)",
                 }
             )
 
@@ -386,7 +411,14 @@ def get_grid(region: str = "US-WEST", config=None, seed: int | None = None) -> M
             # Try to import from the optional arboric-cloud package
             from arboric_cloud import create_live_grid
 
-            return create_live_grid(live_data.api_key, live_data.api_secret, region)
+            return create_live_grid(
+                username=live_data.api_key,
+                password=live_data.api_secret,
+                region=region,
+                pricing_by_region=live_data.pricing_by_region,
+                pricing_api_keys=live_data.pricing_api_keys,
+                strict_pricing=live_data.strict_pricing,
+            )
         except ImportError:
             # arboric-cloud not installed, fall back to MockGrid
             import logging

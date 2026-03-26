@@ -52,9 +52,10 @@ class TestMockGrid:
         assert forecast["co2_intensity"].min() >= 50
         assert forecast["co2_intensity"].max() <= 800
 
-        # Price should be between $0.02 and $0.50 per kWh
-        assert forecast["price"].min() >= 0.02
-        assert forecast["price"].max() <= 0.50
+        # Price should be between floor (with 15% noise slack) and on-demand rate (in $/hr)
+        # US-WEST: floor=$10.08/hr, noise can go down to 85% of floor=$8.57, ceiling=$24.00
+        assert forecast["price"].min() >= 8.0
+        assert forecast["price"].max() <= 25.0
 
         # Renewable percentage should be between 5 and 95%
         assert forecast["renewable_percentage"].min() >= 5
@@ -124,11 +125,13 @@ class TestMockGrid:
         # Midday should be lower than morning and evening (duck curve)
         assert midday_carbon < morning_carbon or midday_carbon < evening_carbon
 
-    def test_price_correlation_with_solar(self):
-        """Test that prices show variation across the day."""
-        # Test without fixed seed since random variations can affect exact relationships
-        grid = MockGrid(region="US-WEST")
-        forecast = grid.get_forecast(hours=24)
+    def test_spot_price_business_hours_pattern(self):
+        """Test that spot prices show business-hours contention pattern."""
+        from datetime import datetime
+
+        grid = MockGrid(region="US-WEST", seed=42)
+        start_time = datetime(2026, 3, 19, 0, 0, 0)
+        forecast = grid.get_forecast(hours=24, start_time=start_time)
 
         # Prices should vary across the day (not all the same)
         price_std = forecast["price"].std()
@@ -136,6 +139,12 @@ class TestMockGrid:
 
         # Check that we can identify different price windows
         assert forecast["price"].min() < forecast["price"].max()
+
+        # Business hours (9am-6pm, indices 9-17) should average higher than overnight (10pm-6am, indices 22-5)
+        business_hours_avg = forecast.iloc[9:17]["price"].mean()
+        overnight_avg = pd.concat([forecast.iloc[22:24], forecast.iloc[0:6]])["price"].mean()
+        # Business hours spot prices should be higher due to capacity contention
+        assert business_hours_avg > overnight_avg
 
     def test_deterministic_with_seed(self):
         """Test that using a seed produces reproducible results."""

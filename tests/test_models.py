@@ -216,18 +216,18 @@ class TestGridWindow:
         assert dirty_window.is_green_window is False
 
     def test_grid_window_is_cheap_window(self):
-        """Test cheap window detection (< $0.08/kWh)."""
+        """Test cheap window detection (< $12.00/hr spot rate)."""
         cheap_window = GridWindow(
             timestamp=datetime.now(),
             co2_intensity=300.0,
-            price=0.07,
+            price=11.0,
         )
         assert cheap_window.is_cheap_window is True
 
         expensive_window = GridWindow(
             timestamp=datetime.now(),
             co2_intensity=300.0,
-            price=0.15,
+            price=16.0,
         )
         assert expensive_window.is_cheap_window is False
 

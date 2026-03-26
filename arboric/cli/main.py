@@ -129,8 +129,8 @@ def create_comparison_table(result) -> Table:
     # Avg Price
     table.add_row(
         "Avg Price",
-        f"${result.baseline_avg_price:.4f}/kWh",
-        f"${result.optimized_avg_price:.4f}/kWh",
+        f"${result.baseline_avg_price:.2f}/hr",
+        f"${result.optimized_avg_price:.2f}/hr",
         f"{((result.baseline_avg_price - result.optimized_avg_price) / result.baseline_avg_price * 100):+.1f}%",
     )
 
@@ -160,6 +160,16 @@ def create_comparison_table(result) -> Table:
         f"-{result.carbon_savings_kg:.2f} kg",
     )
 
+    table.add_section()
+
+    # UX note: explain the cost/carbon decoupling
+    table.add_row(
+        "[dim]Note[/dim]",
+        "",
+        "[dim]Cost reflects spot rate × duration. Carbon reflects power × duration × grid intensity.[/dim]",
+        "",
+    )
+
     return table
 
 
@@ -184,7 +194,7 @@ def create_forecast_chart(forecast_df, optimal_start, workload_duration) -> str:
     height = 8
 
     # Price chart
-    lines.append(f"  {'Price ($/kWh)':<20} │ ${price_max:.3f}")
+    lines.append(f"  {'Price ($/hr)':<20} │ ${price_max:.2f}")
     for row in range(height - 1, -1, -1):
         line = "  " + " " * 20 + " │ "
         for i, price in enumerate(prices):
@@ -202,7 +212,7 @@ def create_forecast_chart(forecast_df, optimal_start, workload_duration) -> str:
             else:
                 line += " "
         lines.append(line)
-    lines.append(f"  {'':20} │ ${price_min:.3f}")
+    lines.append(f"  {'':20} │ ${price_min:.2f}")
     lines.append(f"  {'':20} └{'─' * hours}")
 
     # Hour labels
@@ -223,7 +233,7 @@ def simulate_optimization_animation(workload_name: str, duration: float = 1.5):
         ("Fetching 24h forecast data...", 0.3),
         ("Analyzing carbon intensity patterns...", 0.2),
         ("Scanning for price anomalies...", 0.2),
-        ("Detecting solar duck curve...", 0.15),
+        ("Detecting spot price contention patterns...", 0.15),
         ("Evaluating feasible windows...", 0.2),
         ("Computing optimal trajectory...", 0.25),
     ]
@@ -792,9 +802,9 @@ minimum cost and carbon emissions.
         border_style=ARBORIC_GREEN,
         header_style=f"bold {ARBORIC_GREEN}",
     )
-    results_table.add_column("Workload", style="white", width=28)
-    results_table.add_column("Scheduled", justify="center", width=12)
-    results_table.add_column("Delay", justify="right", width=8)
+    results_table.add_column("Workload", style="white", width=36, no_wrap=True)
+    results_table.add_column("Scheduled", justify="center", width=10)
+    results_table.add_column("Delay", justify="right", width=10)
     results_table.add_column("Cost Saved", justify="right", width=12)
     results_table.add_column("CO₂ Saved", justify="right", width=12, style=ARBORIC_GREEN)
 
@@ -808,7 +818,7 @@ minimum cost and carbon emissions.
         cost_display = f"[{cost_color}]${r.cost_savings:.2f}[/{cost_color}]"
 
         results_table.add_row(
-            r.workload.name[:27],
+            r.workload.name[:35],
             format_local_time(r.optimal_start),
             delay_str,
             cost_display,
@@ -852,43 +862,32 @@ minimum cost and carbon emissions.
     cost_savings_color = ARBORIC_GREEN if total_cost_saved >= 0 else ARBORIC_AMBER
     cost_savings_label = "SAVINGS" if total_cost_saved >= 0 else "COST"
 
-    # Final impact panel
-    impact_text = f"""
-[bold {ARBORIC_GREEN}]                    ARBORIC IMPACT REPORT                    [/bold {ARBORIC_GREEN}]
-
-┌─────────────────────────────────────────────────────────────┐
-│                                                             │
-│   [bold]Fleet Optimization Summary[/bold]                             │
-│                                                             │
-│   Workloads Processed:  [bold]{len(demo_workloads)}[/bold]                                │
-│   Total Energy:         [bold]{sum(w.energy_kwh for w in demo_workloads):,.0f} kWh[/bold]                          │
-│                                                             │
-├─────────────────────────────────────────────────────────────┤
-│                                                             │
-│   [bold {ARBORIC_RED}]Without Arboric[/bold {ARBORIC_RED}]          [bold {ARBORIC_GREEN}]With Arboric[/bold {ARBORIC_GREEN}]               │
-│   ─────────────────      ─────────────────               │
-│   Cost:    ${total_baseline_cost:>8,.2f}        Cost:    ${total_optimized_cost:>8,.2f}             │
-│   Carbon:  {total_baseline_carbon:>8,.2f} kg      Carbon:  {total_optimized_carbon:>8,.2f} kg           │
-│                                                             │
-├─────────────────────────────────────────────────────────────┤
-│                                                             │
-│   [bold {cost_savings_color}]💰 COST {cost_savings_label}:      ${abs(total_cost_saved):>8,.2f}  ({abs(cost_reduction_pct):.1f}% {"saved" if total_cost_saved >= 0 else "increase"})[/bold {cost_savings_color}]   │
-│   [bold {ARBORIC_GREEN}]🌱 CARBON AVOIDED:    {total_carbon_saved:>8,.2f} kg ({carbon_reduction_pct:.1f}% reduction)[/bold {ARBORIC_GREEN}]   │
-│                                                             │
-└─────────────────────────────────────────────────────────────┘
-
-[bold {cost_savings_color}]═══════════════════════════════════════════════════════════════[/bold {cost_savings_color}]
-[bold {cost_savings_color}]  💵 ANNUALIZED SAVINGS: ${abs(annual_cost_savings):>,.0f}/year {"" if total_cost_saved >= 0 else "(projected cost increase)"}[/bold {cost_savings_color}]
-[bold {cost_savings_color}]═══════════════════════════════════════════════════════════════[/bold {cost_savings_color}]
-
-[dim]Plus: 🌲 {annual_carbon_savings / 1000:,.1f} metric tons CO₂ avoided per year[/dim]
-"""
+    # Final impact panel with clean formatting
+    saved_label = "saved" if total_cost_saved >= 0 else "increase"
+    impact_lines = [
+        f"[bold {ARBORIC_GREEN}]ARBORIC IMPACT REPORT[/bold {ARBORIC_GREEN}]",
+        "",
+        "[bold]Fleet Optimization Summary[/bold]",
+        f"Workloads Processed:  [bold]{len(demo_workloads)}[/bold]",
+        f"Total Energy:         [bold]{sum(w.energy_kwh for w in demo_workloads):,.0f} kWh[/bold]",
+        "",
+        f"[bold {ARBORIC_RED}]Without Arboric[/bold {ARBORIC_RED}]        [bold {ARBORIC_GREEN}]With Arboric[/bold {ARBORIC_GREEN}]",
+        f"Cost:    ${total_baseline_cost:>8,.2f}         Cost:    ${total_optimized_cost:>8,.2f}",
+        f"Carbon:  {total_baseline_carbon:>8,.2f} kg       Carbon:  {total_optimized_carbon:>8,.2f} kg",
+        "",
+        f"[bold {cost_savings_color}]💰 COST {cost_savings_label}:  ${abs(total_cost_saved):>8,.2f}  ({abs(cost_reduction_pct):.1f}% {saved_label})[/bold {cost_savings_color}]",
+        f"[bold {ARBORIC_GREEN}]🌱 CARBON AVOIDED:  {total_carbon_saved:>8,.2f} kg ({carbon_reduction_pct:.1f}% reduction)[/bold {ARBORIC_GREEN}]",
+        "",
+        f"[bold {cost_savings_color}]💵 ANNUALIZED SAVINGS: ${abs(annual_cost_savings):>,.0f}/year[/bold {cost_savings_color}]",
+        f"[dim]🌲 {annual_carbon_savings / 1000:,.1f} metric tons CO₂ avoided per year[/dim]",
+    ]
+    impact_text = "\n".join(impact_lines)
 
     console.print(
         Panel(
             impact_text,
             border_style=ARBORIC_GREEN,
-            padding=(0, 1),
+            padding=(1, 2),
         )
     )
 
@@ -994,11 +993,11 @@ def forecast(
 
         # Status indicator
         status_parts = []
-        if row["price"] < 0.08:
+        if row["price"] < 12.0:
             status_parts.append("💰 CHEAP")
         if row["co2_intensity"] < 200:
             status_parts.append("🌱 GREEN")
-        if row["price"] > 0.18:
+        if row["price"] > 17.0:
             status_parts.append("⚠️  PEAK")
         if row["co2_intensity"] > 500:
             status_parts.append("🏭 DIRTY")
@@ -1019,7 +1018,7 @@ def forecast(
     console.print()
     console.print("[bold]Summary:[/bold]")
     console.print(
-        f"  Price range:  ${forecast_df['price'].min():.4f} - ${forecast_df['price'].max():.4f}/kWh"
+        f"  Price range:  ${forecast_df['price'].min():.2f} - ${forecast_df['price'].max():.2f}/hr"
     )
     console.print(
         f"  Carbon range: {forecast_df['co2_intensity'].min():.0f} - {forecast_df['co2_intensity'].max():.0f} gCO₂/kWh"
@@ -1031,7 +1030,7 @@ def forecast(
 
     console.print()
     console.print(
-        f"[bold {ARBORIC_GREEN}]Best price window:[/bold {ARBORIC_GREEN}] {format_local_time(best_price_idx)} (${forecast_df.loc[best_price_idx, 'price']:.4f}/kWh)"
+        f"[bold {ARBORIC_GREEN}]Best price window:[/bold {ARBORIC_GREEN}] {format_local_time(best_price_idx)} (${forecast_df.loc[best_price_idx, 'price']:.2f}/hr)"
     )
     console.print(
         f"[bold {ARBORIC_GREEN}]Greenest window:[/bold {ARBORIC_GREEN}] {format_local_time(best_carbon_idx)} ({forecast_df.loc[best_carbon_idx, 'co2_intensity']:.0f} gCO₂/kWh)"
@@ -1191,8 +1190,8 @@ def config(
             console.print(cli_table)
             console.print()
 
-            # API settings
-            if cfg.api.live_api_enabled:
+            # Live data settings
+            if cfg.live_data.enabled:
                 console.print(f"[{ARBORIC_GREEN}]✓[/{ARBORIC_GREEN}] Live data integration enabled")
             else:
                 console.print(

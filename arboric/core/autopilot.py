@@ -28,6 +28,10 @@ from arboric.core.models import (
 DEFAULT_COST_WEIGHT = 0.7
 DEFAULT_CARBON_WEIGHT = 0.3
 
+# Normalization ceiling for spot instance pricing
+# Represents a "bad" spot price equivalent to on-demand rate
+SPOT_PRICE_NORMALIZATION_CEILING = 25.0  # $/hr
+
 
 class OptimizationConfig:
     """Configuration for the optimization algorithm."""
@@ -96,19 +100,20 @@ class Autopilot:
             return float("inf"), 0, 0
 
         # Calculate metrics for this window
-        avg_price = forecast_slice["price"].mean()
+        avg_spot_price = forecast_slice["price"].mean()  # $/hr
         avg_carbon = forecast_slice["co2_intensity"].mean()
 
-        # Total cost = price * energy
-        energy_kwh = workload.energy_kwh
-        total_cost = avg_price * energy_kwh
+        # Total cost = spot rate ($/hr) * duration (hours)
+        # Note: cost is now independent of power draw (which still affects carbon)
+        total_cost = avg_spot_price * workload.duration_hours
 
         # Total carbon = intensity * energy / 1000 (convert g to kg)
+        energy_kwh = workload.energy_kwh
         total_carbon_kg = (avg_carbon * energy_kwh) / 1000
 
         # Normalize for scoring (scale to comparable ranges)
-        # Price: assume $0.30/kWh is "bad", $0.05/kWh is "good"
-        price_normalized = min(avg_price / 0.30, 1.0) * 100
+        # Price: assume $25/hr is "bad" (on-demand rate), lower is better
+        price_normalized = min(avg_spot_price / SPOT_PRICE_NORMALIZATION_CEILING, 1.0) * 100
 
         # Carbon: assume 600 gCO2/kWh is "bad", 100 gCO2/kWh is "good"
         carbon_normalized = min(avg_carbon / 600, 1.0) * 100

@@ -58,6 +58,15 @@ class LiveDataSettings(BaseModel):
     provider: str | None = Field(default=None, description="Data provider")
     api_key: str | None = Field(default=None, description="API key for live data provider")
     api_secret: str | None = Field(default=None, description="API secret for live data provider")
+    pricing_by_region: dict[str, str] | None = Field(
+        default=None, description="Pricing provider by region"
+    )
+    pricing_api_keys: dict[str, str] | None = Field(
+        default=None, description="Pricing API keys by provider"
+    )
+    strict_pricing: bool = Field(
+        default=False, description="Require pricing data (fail if unavailable)"
+    )
 
 
 class CLISettings(BaseModel):
