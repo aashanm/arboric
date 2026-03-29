@@ -486,8 +486,8 @@ def optimize(
         provider_profiles = INSTANCE_PROFILES.get(workload.cloud_provider, {})
         instance_profile = provider_profiles.get(workload.instance_type)
         if instance_profile:
-            instance_info = f"""[bold]Instance:[/bold] {workload.instance_type} ({workload.cloud_provider.upper()}) · {instance_profile['gpu']} · {instance_profile['use_case']}
-[bold]On-demand:[/bold] ${instance_profile['on_demand']:.2f}/hr
+            instance_info = f"""[bold]Instance:[/bold] {workload.instance_type} ({workload.cloud_provider.upper()}) · {instance_profile["gpu"]} · {instance_profile["use_case"]}
+[bold]On-demand:[/bold] ${instance_profile["on_demand"]:.2f}/hr
 """
             # Power is auto-derived from instance profile
             power_note = f"[dim](auto-estimated from {workload.instance_type}: {workload.power_draw_kw} kW)[/dim]"
