@@ -44,14 +44,18 @@ That's it. See a live demo of cost and carbon optimization on your local grid re
 ### CLI for Single Workloads
 
 ```bash
-# Optimize a specific job: 6h @ 120kW, must finish within 24h
-arboric optimize "LLM Training" --duration 6 --power 120 --deadline 24 --region US-WEST
+# Optimize a specific job: 6h, must finish within 24h
+# Power is auto-derived from instance type, or defaults to 100 kW
+arboric optimize "LLM Training" --duration 6 --deadline 24 --instance-type p3.8xlarge --provider aws
 
 # See the grid forecast (prices + carbon intensity)
-arboric forecast --region US-WEST
+arboric forecast --region US-WEST --hours 24
 
 # Explore cost-vs-carbon tradeoffs
-arboric tradeoff "ETL" --duration 2 --power 40 --region US-WEST
+arboric tradeoff "ETL" --duration 2 --deadline 12 --region US-WEST
+
+# Project annual savings with frequency (daily, weekdays, weekly, monthly, or runs/week)
+arboric optimize "Batch Job" --duration 4 --deadline 24 --frequency weekly
 ```
 
 ### Real Output
@@ -96,17 +100,21 @@ curl -X POST http://localhost:8000/api/v1/optimize \
       "name": "Training Job",
       "duration_hours": 6,
       "power_draw_kw": 120,
-      "deadline_hours": 24
+      "deadline_hours": 24,
+      "instance_type": "p3.8xlarge",
+      "cloud_provider": "aws"
     },
-    "region": "US-WEST"
+    "region": "US-WEST",
+    "runs_per_week": 1
   }'
 ```
 
 Response includes:
-- `optimal_start_hour` — when to run (absolute hour in 0-23 range)
-- `cost_savings_usd` — money saved vs. running now
-- `carbon_savings_kg` — CO₂ avoided
-- `grid_forecast` — 48-hour price and carbon snapshot
+- `region` — which region was optimized (or optimal region if "all" was specified)
+- `optimization.optimal_start` — when to run (ISO 8601 timestamp)
+- `optimization.delay_hours` — hours to delay from now
+- `metrics.savings` — cost and carbon savings vs. immediate execution
+- Supports annual projection with `runs_per_week` (frequency of job execution per week)
 
 **POST /api/v1/fleet/optimize** — Optimize multiple workloads
 ```bash
@@ -128,7 +136,11 @@ Returns aggregated savings + per-workload schedules.
 curl "http://localhost:8000/api/v1/forecast?region=US-WEST&hours=24"
 ```
 
-Returns hourly forecast: `[{hour, price_usd_per_kwh, carbon_gco2_per_kwh, renewable_percent}, ...]`
+Returns hourly forecast with:
+- `price` — Spot instance price ($/hour)
+- `co2_intensity` — Carbon intensity (gCO₂/kWh)
+- `renewable_percentage` — Renewable energy penetration
+- `timestamp` — Forecast window start time
 
 **GET /api/v1/health** — Health check
 ```bash
@@ -153,17 +165,40 @@ response = client.post("/api/v1/optimize", json={
         "name": "Model Training",
         "duration_hours": 8,
         "power_draw_kw": 200,
-        "deadline_hours": 24
+        "deadline_hours": 24,
+        "instance_type": "p3.8xlarge",
+        "cloud_provider": "aws"
     },
-    "region": "US-WEST"
+    "region": "US-WEST",
+    "runs_per_week": 1  # For annual savings projection
 })
 
 result = response.json()
-print(f"Start at hour: {result['data']['schedule']['optimal_start_hour']}")
-print(f"Save: ${result['data']['metrics']['savings']['cost']:.2f}")
+data = result['data']
+print(f"Region: {data['region']}")
+print(f"Delay: {data['optimization']['delay_hours']} hours")
+print(f"Save: ${data['metrics']['savings']['cost']:.2f}")
+print(f"Annual savings: ${data['metrics']['savings'].get('annual_cost_savings', 0):.2f}")
 ```
 
 Works with any orchestration (Airflow DAGs, Kubernetes Jobs, Lambda, etc.).
+
+### Annual Savings Projection
+
+To estimate annual savings, provide `runs_per_week` in your request. Arboric will multiply per-run savings by frequency:
+
+**CLI:**
+```bash
+arboric optimize "Batch Job" --frequency daily        # 365 runs/year
+arboric optimize "Batch Job" --frequency weekly       # 52 runs/year
+arboric optimize "Batch Job" --frequency monthly      # 12 runs/year
+arboric optimize "Batch Job" --frequency 5            # 5 runs/week = 260/year
+```
+
+**API:**
+Pass `runs_per_week` in your request. Response includes:
+- `metrics.savings.annual_cost_savings` — Projected annual savings
+- `metrics.savings.annual_projection_basis` — Frequency used for calculation
 
 ---
 
@@ -174,6 +209,9 @@ Works with any orchestration (Airflow DAGs, Kubernetes Jobs, Lambda, etc.).
 - **Grid regions** — Pre-configured profiles for US-WEST, US-EAST, EU-WEST, NORDIC (carbon/price patterns learned from real grid data)
 - **Fleet scheduling** — Optimize multiple jobs together or independently
 - **Real grid data** — MockGrid (realistic simulation) or live API (requires `pip install arboric[cloud]`)
+- **Instance-aware** — Auto-derives power consumption from cloud instance types (AWS, GCP, Azure)
+- **Frequency projections** — Project annual savings with human-readable frequency presets (daily, weekdays, weekly, monthly)
+- **Region tracking** — Clearly displays which region optimization used; supports cross-region comparison with `--region all`
 - **Multi-output** — CLI, REST API, JSON/CSV exports for metrics tracking
 - **Type-safe** — Full Python type hints + Pydantic validation
 
@@ -358,13 +396,14 @@ See [config.yaml](config.yaml) for the full example. Key settings:
 ```yaml
 optimization:
   cost_weight: 0.7      # Cost vs. carbon tradeoff (0-1)
-  carbon_weight: 0.3     # Must sum to 1.0
+  carbon_weight: 0.3    # Must sum to 1.0
 
 defaults:
-  duration_hours: 6.0    # Used if --duration not specified
-  power_draw_kw: 100.0   # Used if --power not specified
-  deadline_hours: 24.0   # Used if --deadline not specified
-  region: US-WEST        # US-WEST, US-EAST, EU-WEST, NORDIC
+  duration_hours: 6.0   # Used if --duration not specified
+  deadline_hours: 24.0  # Used if --deadline not specified
+  region: US-WEST       # US-WEST, US-EAST, EU-WEST, NORDIC
+  instance_type: null   # Cloud instance (e.g., p3.8xlarge); auto-derives power
+  cloud_provider: null  # aws, gcp, or azure
 
 cli:
   show_banner: true
@@ -384,6 +423,9 @@ arboric optimize "My Job"
 
 # Override specific values
 arboric optimize "My Job" --duration 8 --region EU-WEST
+
+# Specify instance type to auto-derive power consumption
+arboric optimize "Training" --instance-type p3.8xlarge --provider aws
 ```
 
 ---

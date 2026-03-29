@@ -18,6 +18,7 @@ import pandas as pd
 
 from arboric.core.models import (
     FleetOptimizationResult,
+    RegionComparisonResult,
     ScheduleResult,
     Workload,
     WorkloadPriority,
@@ -636,6 +637,65 @@ class Autopilot:
             return result
 
         return []
+
+    def compare_regions(
+        self,
+        workload: Workload,
+        regions: list[str] | None = None,
+        seed: int | None = None,
+    ) -> "RegionComparisonResult":
+        """
+        Run temporal optimization independently for each region and return ranked comparison.
+        Does not model data egress costs — caller decides if spatial shift is viable.
+
+        Args:
+            workload: The workload to optimize
+            regions: List of regions to compare (default: all 4 REGION_PROFILES keys)
+            seed: Random seed for forecast generation (optional)
+
+        Returns:
+            RegionComparisonResult with entries sorted by cost (cheapest first)
+        """
+        from arboric.core.grid_oracle import REGION_PROFILES, get_grid
+        from arboric.core.models import RegionComparisonResult, RegionScheduleEntry
+
+        regions = regions or list(REGION_PROFILES.keys())
+        entries = []
+
+        for region in regions:
+            grid = get_grid(
+                region=region,
+                instance_type=workload.instance_type,
+                cloud_provider=workload.cloud_provider,
+                seed=seed,
+            )
+            forecast = grid.get_forecast(hours=int(workload.deadline_hours) + 4)
+            result = self.optimize_schedule(workload, forecast)
+            entries.append(
+                RegionScheduleEntry(
+                    region=region,
+                    optimal_start_clock=result.optimal_start_clock,
+                    delay_hours=result.delay_hours,
+                    avg_spot_price=result.optimized_avg_price,
+                    avg_carbon=result.optimized_avg_carbon,
+                    optimized_cost=result.optimized_cost,
+                    optimized_carbon_kg=result.optimized_carbon_kg,
+                    cost_savings=result.cost_savings,
+                    cost_savings_percent=result.cost_savings_percent,
+                    carbon_savings_kg=result.carbon_savings_kg,
+                    carbon_savings_percent=result.carbon_savings_percent,
+                    on_demand_rate_per_hr=result.on_demand_rate_per_hr,
+                )
+            )
+
+        entries.sort(key=lambda e: e.optimized_cost)
+        return RegionComparisonResult(
+            workload_name=workload.name,
+            duration_hours=workload.duration_hours,
+            entries=entries,
+            cheapest_region=entries[0].region,
+            cleanest_region=min(entries, key=lambda e: e.avg_carbon).region,
+        )
 
 
 def create_autopilot(

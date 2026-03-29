@@ -75,6 +75,8 @@ def _serialize_schedule_result(result: ScheduleResult) -> dict:
     base_dict["cost_savings_percent"] = result.cost_savings_percent
     base_dict["carbon_savings_percent"] = result.carbon_savings_percent
     base_dict["delay_hours"] = result.delay_hours
+    base_dict["optimal_start_clock"] = result.optimal_start_clock
+    base_dict["deadline_slack_hours"] = result.deadline_slack_hours
 
     # Add computed property from nested Workload
     base_dict["workload"]["energy_kwh"] = result.workload.energy_kwh
