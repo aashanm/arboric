@@ -220,6 +220,17 @@
     // Performance fee from pitch doc
     const PERFORMANCE_FEE = 0.20;
 
+    // Savings realization rate (user keeps 80% after performance fee)
+    const SAVINGS_REALIZATION_RATE = 0.80;
+
+    // Frequency presets for annual projection
+    const FREQUENCY_PRESETS = {
+      daily: 365,
+      weekdays: 260,  // 5 × 52
+      weekly: 52,
+      monthly: 12,
+    };
+
     // SB 253 deadline
     const SB253_DEADLINE = new Date('2027-01-01T00:00:00');
 
@@ -1097,6 +1108,7 @@
       const [region, setRegion] = useState('US-WEST');
       const [provider, setProvider] = useState('aws');
       const [instanceType, setInstanceType] = useState('p3.8xlarge');
+      const [frequency, setFrequency] = useState('daily');
 
       const dDuration = useDebounce(duration, 150);
       const dPower = useDebounce(power, 150);
@@ -1114,7 +1126,8 @@
       const animCostPct = useAnimatedNumber(result.costSavingsPercent, 600, 1);
       const animCarbonPct = useAnimatedNumber(result.carbonSavingsPercent, 600, 1);
 
-      const annualSavings = result.costSavings * 0.80 * 365;
+      const runsPerYear = FREQUENCY_PRESETS[frequency];
+      const annualSavings = result.costSavings * SAVINGS_REALIZATION_RATE * runsPerYear;
       const youPay = result.costSavings * PERFORMANCE_FEE;
 
       return (
@@ -1126,7 +1139,7 @@
             </p>
 
             {/* Inputs */}
-            <div className="mt-12 grid sm:grid-cols-2 lg:grid-cols-4 gap-6">
+            <div className="mt-12 grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
               <div>
                 <label className="block text-sm text-neutral-400 mb-2" htmlFor="calc-duration">
                   Duration <span className="text-white font-mono font-bold">{duration}h</span>
@@ -1134,15 +1147,6 @@
                 <input id="calc-duration" type="range" min="1" max="24" step="1" value={duration}
                   onChange={e => setDuration(+e.target.value)}
                   aria-label={`Workload duration: ${duration} hours`}
-                  className="w-full"/>
-              </div>
-              <div>
-                <label className="block text-sm text-neutral-400 mb-2" htmlFor="calc-power">
-                  Power Draw <span className="text-white font-mono font-bold">{power} kW</span>
-                </label>
-                <input id="calc-power" type="range" min="10" max="500" step="10" value={power}
-                  onChange={e => setPower(+e.target.value)}
-                  aria-label={`Power draw: ${power} kilowatts`}
                   className="w-full"/>
               </div>
               <div>
@@ -1164,8 +1168,19 @@
               </div>
             </div>
 
-            {/* Instance Selection */}
-            <div className="mt-6 grid sm:grid-cols-2 gap-6">
+            {/* Configuration */}
+            <div className="mt-6 grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
+              <div>
+                <label className="block text-sm text-neutral-400 mb-2" htmlFor="calc-frequency">Frequency</label>
+                <select id="calc-frequency" value={frequency} onChange={e => setFrequency(e.target.value)}
+                  aria-label="Job frequency"
+                  className="w-full bg-surface border border-border rounded-lg px-4 py-2.5 text-white font-mono text-sm">
+                  <option value="daily">Daily</option>
+                  <option value="weekdays">Weekdays (5×/wk)</option>
+                  <option value="weekly">Weekly</option>
+                  <option value="monthly">Monthly</option>
+                </select>
+              </div>
               <div>
                 <label className="block text-sm text-neutral-400 mb-2" htmlFor="calc-provider">Cloud Provider</label>
                 <select id="calc-provider" value={provider} onChange={e => {
@@ -1187,7 +1202,7 @@
                   aria-label="Instance type"
                   className="w-full bg-surface border border-border rounded-lg px-4 py-2.5 text-white font-mono text-sm">
                   {INSTANCE_PROFILES[provider] && Object.entries(INSTANCE_PROFILES[provider]).map(([key, val]) => (
-                    <option key={key} value={key}>{key} — {val.gpu} · ${val.on_demand}/hr</option>
+                    <option key={key} value={key}>{key} — {val.gpu}</option>
                   ))}
                 </select>
               </div>
@@ -1268,7 +1283,7 @@
               </p>
               {annualSavings > 0 && (
                 <p className="mt-4 text-xl md:text-2xl font-bold text-white">
-                  At this usage running daily, that's{' '}
+                  At this usage running {frequency}, that's{' '}
                   <span className="text-green-400 font-mono">${Math.round(annualSavings).toLocaleString()}/year</span>{' '}
                   you're leaving on the table.
                 </p>
