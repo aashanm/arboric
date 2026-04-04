@@ -34,7 +34,7 @@ REGION_PROFILES = {
         "on_demand_rate_per_hr": 24.00,  # Reference GPU on-demand rate ($/hr)
         "spot_floor_discount": 0.58,  # 58% off = $10.08/hr floor (overnight cheap)
         "spot_peak_discount": 0.25,  # 25% off = $18.00/hr peak (business hours)
-        "contention_peak_hour": 17,  # 5 PM PT - peak cloud usage (end of business day)
+        "contention_peak_hour": 14,  # 2 PM PT - peak ML batch job submission
         "timezone_offset": -8,
     },
     "US-EAST": {
@@ -44,7 +44,7 @@ REGION_PROFILES = {
         "on_demand_rate_per_hr": 22.00,
         "spot_floor_discount": 0.55,  # → floor=$9.90/hr, peak=$17.60/hr
         "spot_peak_discount": 0.20,
-        "contention_peak_hour": 16,  # 4 PM ET - peak cloud usage
+        "contention_peak_hour": 14,  # 2 PM ET - peak ML batch job submission
         "timezone_offset": -5,
     },
     "EU-WEST": {
@@ -54,7 +54,7 @@ REGION_PROFILES = {
         "on_demand_rate_per_hr": 20.00,
         "spot_floor_discount": 0.50,  # → floor=$10.00/hr, peak=$17.00/hr
         "spot_peak_discount": 0.15,
-        "contention_peak_hour": 15,  # 3 PM CET - peak cloud usage
+        "contention_peak_hour": 13,  # 1 PM CET - peak ML batch job submission
         "timezone_offset": 1,
     },
     "NORDIC": {
@@ -64,9 +64,161 @@ REGION_PROFILES = {
         "on_demand_rate_per_hr": 18.00,
         "spot_floor_discount": 0.60,  # → floor=$7.20/hr, peak=$12.60/hr
         "spot_peak_discount": 0.30,
-        "contention_peak_hour": 14,  # 2 PM CET - peak cloud usage
+        "contention_peak_hour": 13,  # 1 PM CET - peak ML batch job submission
         "timezone_offset": 1,
     },
+}
+
+# Cloud instance profiles for spot pricing simulation
+# Maps (provider, instance_type) → (on_demand rate, spot floor discount)
+INSTANCE_PROFILES = {
+    "aws": {
+        "p3.2xlarge": {
+            "on_demand": 3.06,
+            "spot_floor_discount": 0.70,
+            "gpu": "V100 (1x)",
+            "use_case": "ML training / inference",
+            "typical_power_kw": 0.4,
+        },
+        "p3.8xlarge": {
+            "on_demand": 12.24,
+            "spot_floor_discount": 0.68,
+            "gpu": "V100 (4x)",
+            "use_case": "Distributed training",
+            "typical_power_kw": 1.2,
+        },
+        "p3.16xlarge": {
+            "on_demand": 24.48,
+            "spot_floor_discount": 0.65,
+            "gpu": "V100 (8x)",
+            "use_case": "Large model training",
+            "typical_power_kw": 2.3,
+        },
+        "p4d.24xlarge": {
+            "on_demand": 32.77,
+            "spot_floor_discount": 0.60,
+            "gpu": "A100 (8x)",
+            "use_case": "Foundation model training",
+            "typical_power_kw": 4.0,
+        },
+        "g5.xlarge": {
+            "on_demand": 1.006,
+            "spot_floor_discount": 0.72,
+            "gpu": "A10G (1x)",
+            "use_case": "Inference / fine-tuning",
+            "typical_power_kw": 0.3,
+        },
+        "g5.12xlarge": {
+            "on_demand": 5.672,
+            "spot_floor_discount": 0.68,
+            "gpu": "A10G (4x)",
+            "use_case": "Mid-scale training",
+            "typical_power_kw": 1.0,
+        },
+        "g4dn.xlarge": {
+            "on_demand": 0.526,
+            "spot_floor_discount": 0.75,
+            "gpu": "T4 (1x)",
+            "use_case": "Inference / small training",
+            "typical_power_kw": 0.3,
+        },
+        "g4dn.12xlarge": {
+            "on_demand": 3.912,
+            "spot_floor_discount": 0.71,
+            "gpu": "T4 (4x)",
+            "use_case": "Batch inference",
+            "typical_power_kw": 0.9,
+        },
+    },
+    "gcp": {
+        "n1-standard-8-v100": {
+            "on_demand": 2.48,
+            "spot_floor_discount": 0.72,
+            "gpu": "V100 (1x)",
+            "use_case": "ML training",
+            "typical_power_kw": 0.4,
+        },
+        "a2-highgpu-1g": {
+            "on_demand": 3.67,
+            "spot_floor_discount": 0.67,
+            "gpu": "A100 (1x)",
+            "use_case": "Training / inference",
+            "typical_power_kw": 0.5,
+        },
+        "a2-highgpu-4g": {
+            "on_demand": 14.69,
+            "spot_floor_discount": 0.65,
+            "gpu": "A100 (4x)",
+            "use_case": "Distributed training",
+            "typical_power_kw": 1.5,
+        },
+        "a2-highgpu-8g": {
+            "on_demand": 29.39,
+            "spot_floor_discount": 0.63,
+            "gpu": "A100 (8x)",
+            "use_case": "Large model training",
+            "typical_power_kw": 2.8,
+        },
+        "g2-standard-4": {
+            "on_demand": 0.90,
+            "spot_floor_discount": 0.73,
+            "gpu": "L4 (1x)",
+            "use_case": "Inference",
+            "typical_power_kw": 0.3,
+        },
+        "g2-standard-16": {
+            "on_demand": 3.59,
+            "spot_floor_discount": 0.70,
+            "gpu": "L4 (4x)",
+            "use_case": "Batch inference",
+            "typical_power_kw": 0.9,
+        },
+    },
+    "azure": {
+        "Standard_NC6s_v3": {
+            "on_demand": 3.06,
+            "spot_floor_discount": 0.68,
+            "gpu": "V100 (1x)",
+            "use_case": "ML training",
+            "typical_power_kw": 0.4,
+        },
+        "Standard_NC24s_v3": {
+            "on_demand": 12.24,
+            "spot_floor_discount": 0.65,
+            "gpu": "V100 (4x)",
+            "use_case": "Distributed training",
+            "typical_power_kw": 1.2,
+        },
+        "Standard_ND96asr_v4": {
+            "on_demand": 27.20,
+            "spot_floor_discount": 0.60,
+            "gpu": "A100 (8x)",
+            "use_case": "Foundation model training",
+            "typical_power_kw": 3.8,
+        },
+        "Standard_NC4as_T4_v3": {
+            "on_demand": 0.526,
+            "spot_floor_discount": 0.74,
+            "gpu": "T4 (1x)",
+            "use_case": "Inference",
+            "typical_power_kw": 0.3,
+        },
+        "Standard_NC16as_T4_v3": {
+            "on_demand": 1.204,
+            "spot_floor_discount": 0.71,
+            "gpu": "T4 (4x)",
+            "use_case": "Batch inference",
+            "typical_power_kw": 0.9,
+        },
+    },
+}
+
+DEFAULT_INSTANCE = {
+    "on_demand": 12.24,
+    "spot_floor_discount": 0.68,
+    "gpu": "GPU (unspecified)",
+    "use_case": "General ML workload",
+    "typical_power_kw": 1.2,
 }
 
 
@@ -82,12 +234,20 @@ class MockGrid:
     the greenest carbon window, sometimes they don't. This tension creates the scheduling tradeoff.
     """
 
-    def __init__(self, region: str = "US-WEST", seed: int | None = None):
+    def __init__(
+        self,
+        region: str = "US-WEST",
+        instance_type: str | None = None,
+        cloud_provider: str | None = None,
+        seed: int | None = None,
+    ):
         """
         Initialize the grid simulator.
 
         Args:
             region: Grid region identifier (US-WEST, US-EAST, EU-WEST, NORDIC)
+            instance_type: Cloud instance type (e.g., 'p3.8xlarge'). Use with cloud_provider.
+            cloud_provider: Cloud provider ('aws', 'gcp', 'azure'). Use with instance_type.
             seed: Random seed for reproducible forecasts (None for varied demos)
         """
         self.region = region.upper()
@@ -97,6 +257,13 @@ class MockGrid:
             )
 
         self.profile = REGION_PROFILES[self.region]
+
+        # Resolve instance profile
+        if cloud_provider and instance_type:
+            provider_profiles = INSTANCE_PROFILES.get(cloud_provider.lower(), {})
+            self.instance_profile = provider_profiles.get(instance_type, DEFAULT_INSTANCE)
+        else:
+            self.instance_profile = DEFAULT_INSTANCE
 
         # Use instance-specific random generator for reproducible results
         self._random = random.Random(seed)
@@ -172,7 +339,7 @@ class MockGrid:
         )
         return max(50, min(800, intensity))  # Clamp to realistic range
 
-    def _calculate_price(self, hour: float) -> float:
+    def _calculate_price(self, hour: float, instance_profile: dict | None = None) -> float:
         """
         Calculate cloud spot instance price for a given hour.
 
@@ -184,9 +351,17 @@ class MockGrid:
 
         Key insight: Spot prices driven by spare cloud capacity and job queue length,
         completely independent from grid carbon (which depends on solar/peaker plants).
+
+        Args:
+            hour: Hour of day (0-24)
+            instance_profile: Instance profile dict with 'on_demand' and 'spot_floor_discount'.
+                            If None, uses self.instance_profile
         """
-        on_demand = self.profile["on_demand_rate_per_hr"]
-        floor_price = on_demand * (1 - self.profile["spot_floor_discount"])
+        if instance_profile is None:
+            instance_profile = self.instance_profile
+
+        on_demand = instance_profile["on_demand"]
+        floor_price = on_demand * (1 - instance_profile["spot_floor_discount"])
         peak_price = on_demand * (1 - self.profile["spot_peak_discount"])
         price_range = peak_price - floor_price
 
@@ -268,15 +443,15 @@ class MockGrid:
 
             # Calculate values with trend factor and ensure they stay in valid ranges
             co2 = self._calculate_carbon_intensity(hour_of_day) * trend_factor
-            price = self._calculate_price(hour_of_day) * trend_factor
+            price = self._calculate_price(hour_of_day, self.instance_profile) * trend_factor
 
-            # Clamp price using dynamic bounds based on region profile
+            # Clamp price using dynamic bounds based on instance profile
             floor = (
-                self.profile["on_demand_rate_per_hr"]
-                * (1 - self.profile["spot_floor_discount"])
+                self.instance_profile["on_demand"]
+                * (1 - self.instance_profile["spot_floor_discount"])
                 * 0.85
             )
-            ceiling = self.profile["on_demand_rate_per_hr"]
+            ceiling = self.instance_profile["on_demand"]
 
             window = GridWindow(
                 timestamp=timestamp,
@@ -295,6 +470,10 @@ class MockGrid:
         df["timestamp"] = pd.to_datetime(df["timestamp"])
         df = df.set_index("timestamp")
 
+        # Add instance pricing metadata columns
+        df["on_demand_rate"] = self.instance_profile["on_demand"]
+        df["spot_discount_pct"] = 1 - (df["price"] / self.instance_profile["on_demand"])
+
         return df
 
     def get_current_conditions(self) -> GridWindow:
@@ -305,7 +484,7 @@ class MockGrid:
         return GridWindow(
             timestamp=now,
             co2_intensity=self._calculate_carbon_intensity(hour_of_day),
-            price=self._calculate_price(hour_of_day),
+            price=self._calculate_price(hour_of_day, self.instance_profile),
             renewable_percentage=self._calculate_renewable_percentage(hour_of_day),
             region=self.region,
             confidence=1.0,
@@ -333,9 +512,7 @@ class MockGrid:
             )
 
         # Detect spot price spikes (10% above nominal peak contention rate)
-        peak_price = self.profile["on_demand_rate_per_hr"] * (
-            1 - self.profile["spot_peak_discount"]
-        )
+        peak_price = self.instance_profile["on_demand"] * (1 - self.profile["spot_peak_discount"])
         spike_threshold = peak_price * 1.10
         high_price_periods = forecast_df[forecast_df["price"] > spike_threshold]
         if not high_price_periods.empty:
@@ -362,8 +539,8 @@ class MockGrid:
             )
 
         # Detect cheap windows (within 15% above floor = genuine buying opportunity)
-        floor_price = self.profile["on_demand_rate_per_hr"] * (
-            1 - self.profile["spot_floor_discount"]
+        floor_price = self.instance_profile["on_demand"] * (
+            1 - self.instance_profile["spot_floor_discount"]
         )
         cheap_threshold = floor_price * 1.15
         cheap_periods = forecast_df[forecast_df["price"] < cheap_threshold]
@@ -380,7 +557,13 @@ class MockGrid:
         return events
 
 
-def get_grid(region: str = "US-WEST", config=None, seed: int | None = None) -> MockGrid:  # type: ignore
+def get_grid(
+    region: str = "US-WEST",
+    config=None,
+    seed: int | None = None,
+    instance_type: str | None = None,
+    cloud_provider: str | None = None,
+) -> MockGrid:  # type: ignore
     """Factory function to create a grid oracle for a region.
 
     Returns LiveGrid (from arboric-cloud) if available and credentials configured,
@@ -391,6 +574,9 @@ def get_grid(region: str = "US-WEST", config=None, seed: int | None = None) -> M
         config: Optional ArboricConfig instance (loaded from file if None)
         seed: Optional random seed. If None and using MockGrid, seeds based on current date
               for reproducibility within a day.
+        instance_type: Cloud instance type (e.g., 'p3.8xlarge'). Use with cloud_provider.
+        cloud_provider: Cloud provider ('aws', 'gcp', 'azure'). Use with instance_type.
+                       Note: ignored for LiveGrid (passed through but not used).
 
     Returns:
         Grid provider instance (LiveGrid or MockGrid)
@@ -439,4 +625,9 @@ def get_grid(region: str = "US-WEST", config=None, seed: int | None = None) -> M
         from datetime import datetime as dt
 
         seed = int(dt.now().strftime("%Y%m%d"))
-    return MockGrid(region=region, seed=seed)
+    return MockGrid(
+        region=region,
+        instance_type=instance_type,
+        cloud_provider=cloud_provider,
+        seed=seed,
+    )

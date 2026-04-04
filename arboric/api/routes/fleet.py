@@ -40,8 +40,19 @@ async def optimize_fleet(
         HTTPException: 400 for business logic errors, 500 for unexpected errors
     """
     try:
-        # Get grid forecast
-        grid = get_grid(region=request.region, config=get_config())
+        # Get grid forecast (use first workload's instance type if specified)
+        instance_type = None
+        cloud_provider = None
+        if request.workloads and request.workloads[0].instance_type:
+            instance_type = request.workloads[0].instance_type
+            cloud_provider = request.workloads[0].cloud_provider
+
+        grid = get_grid(
+            region=request.region,
+            config=get_config(),
+            instance_type=instance_type,
+            cloud_provider=cloud_provider,
+        )
         forecast_hours = request.forecast_hours or 48
         # Pass appropriate time based on grid type
         now_local = datetime.now().replace(minute=0, second=0, microsecond=0)

@@ -9,7 +9,9 @@ from datetime import datetime
 from enum import Enum
 from uuid import UUID, uuid4
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
+
+VALID_CLOUD_PROVIDERS = frozenset({"aws", "gcp", "azure"})
 
 
 class WorkloadPriority(str, Enum):
@@ -70,8 +72,11 @@ class Workload(BaseModel):
     id: UUID = Field(default_factory=uuid4, description="Unique workload identifier")
     name: str = Field(..., min_length=1, max_length=128, description="Human-readable workload name")
     duration_hours: float = Field(..., gt=0, le=168, description="Expected runtime in hours")
-    power_draw_kw: float = Field(
-        ..., gt=0, le=10000, description="Average power consumption in kilowatts"
+    power_draw_kw: float | None = Field(
+        default=None,
+        gt=0,
+        le=10000,
+        description="Average power consumption in kilowatts. Auto-resolved from instance profile when instance_type is set.",
     )
     deadline_hours: float = Field(
         ..., gt=0, le=720, description="Must complete within this many hours"
@@ -86,6 +91,18 @@ class Workload(BaseModel):
     dependencies: list["WorkloadDependency"] = Field(
         default=[], description="List of prerequisite workloads that must complete first"
     )
+    instance_type: str | None = Field(
+        default=None,
+        description=(
+            "Cloud instance type for spot pricing. "
+            "Examples: 'p3.8xlarge' (AWS), 'a2-highgpu-4g' (GCP), 'Standard_NC24s_v3' (Azure). "
+            "Must be provided together with cloud_provider."
+        ),
+    )
+    cloud_provider: str | None = Field(
+        default=None,
+        description="Cloud provider: 'aws', 'gcp', or 'azure'. Must be provided with instance_type.",
+    )
 
     @field_validator("deadline_hours")
     @classmethod
@@ -95,13 +112,45 @@ class Workload(BaseModel):
             raise ValueError("deadline_hours must be >= duration_hours")
         return v
 
+    @model_validator(mode="after")
+    def validate_instance_fields(self) -> "Workload":
+        """Ensure instance_type and cloud_provider are either both set or both None. Auto-resolve power_draw_kw from instance profile if not set."""
+        has_type = self.instance_type is not None
+        has_provider = self.cloud_provider is not None
+        if has_type != has_provider:
+            raise ValueError("instance_type and cloud_provider must both be set or both be None.")
+        if has_provider:
+            normalized = self.cloud_provider.lower()
+            if normalized not in VALID_CLOUD_PROVIDERS:
+                raise ValueError(
+                    f"cloud_provider must be one of {sorted(VALID_CLOUD_PROVIDERS)}, got {self.cloud_provider!r}"
+                )
+            object.__setattr__(self, "cloud_provider", normalized)
+
+        # Auto-resolve power_draw_kw from instance profile if not set
+        if self.power_draw_kw is None:
+            if self.instance_type and self.cloud_provider:
+                from arboric.core.grid_oracle import DEFAULT_INSTANCE, INSTANCE_PROFILES
+
+                prof = INSTANCE_PROFILES.get(self.cloud_provider, {}).get(
+                    self.instance_type, DEFAULT_INSTANCE
+                )
+                object.__setattr__(self, "power_draw_kw", prof["typical_power_kw"])
+            else:
+                object.__setattr__(self, "power_draw_kw", 100.0)  # neutral fallback
+
+        return self
+
     @property
     def energy_kwh(self) -> float:
         """Total energy consumption for the workload."""
         return self.power_draw_kw * self.duration_hours
 
     def __str__(self) -> str:
-        return f"Workload({self.name}, {self.duration_hours}h @ {self.power_draw_kw}kW)"
+        result = f"Workload({self.name}, {self.duration_hours}h @ {self.power_draw_kw}kW)"
+        if self.instance_type:
+            result += f" [{self.instance_type} ({self.cloud_provider.upper()})]"
+        return result
 
 
 class GridWindow(BaseModel):
@@ -178,6 +227,18 @@ class ScheduleResult(BaseModel):
         ..., ge=0, description="Average carbon during baseline window"
     )
 
+    # Instance pricing metadata
+    on_demand_rate_per_hr: float | None = Field(
+        default=None,
+        description="On-demand rate for the scheduled instance type ($/hr), if instance was specified.",
+    )
+
+    # Constraint enforcement flag
+    cost_constrained: bool = Field(
+        default=False,
+        description="True if cost constraint was applied (composite score recommended a more expensive window, so minimum-cost window was selected instead).",
+    )
+
     @property
     def cost_savings(self) -> float:
         """Dollar savings from optimization."""
@@ -206,6 +267,54 @@ class ScheduleResult(BaseModel):
     def delay_hours(self) -> float:
         """Hours delayed from immediate start."""
         return (self.optimal_start - self.baseline_start).total_seconds() / 3600
+
+    @property
+    def optimal_start_clock(self) -> str:
+        """Clock time string for optimal start, e.g. '2:00 AM'. Portable across macOS/Linux/Windows."""
+        return self.optimal_start.strftime("%I:%M %p").lstrip("0")
+
+    @property
+    def deadline_slack_hours(self) -> float:
+        """Hours of slack remaining after scheduled completion."""
+        return self.workload.deadline_hours - self.delay_hours - self.workload.duration_hours
+
+
+class RegionScheduleEntry(BaseModel):
+    """Single region's best schedule in a multi-region comparison."""
+
+    region: str
+    optimal_start_clock: str
+    delay_hours: float
+    avg_spot_price: float
+    avg_carbon: float
+    optimized_cost: float
+    optimized_carbon_kg: float
+    cost_savings: float
+    cost_savings_percent: float
+    carbon_savings_kg: float
+    carbon_savings_percent: float
+    on_demand_rate_per_hr: float | None = None
+
+
+class RegionComparisonResult(BaseModel):
+    """Result of running temporal optimization across all regions."""
+
+    workload_name: str
+    duration_hours: float
+    entries: list[RegionScheduleEntry]
+    cheapest_region: str
+    cleanest_region: str
+    generated_at: datetime = Field(default_factory=datetime.now)
+
+    @property
+    def best_cost_entry(self) -> RegionScheduleEntry:
+        """Region with lowest cost."""
+        return min(self.entries, key=lambda e: e.optimized_cost)
+
+    @property
+    def best_carbon_entry(self) -> RegionScheduleEntry:
+        """Region with lowest carbon."""
+        return min(self.entries, key=lambda e: e.avg_carbon)
 
 
 class FleetOptimizationResult(BaseModel):

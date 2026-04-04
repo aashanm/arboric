@@ -36,12 +36,21 @@ class OptimizeRequest(BaseModel):
     """Request model for single workload optimization."""
 
     workload: Workload = Field(..., description="Workload to optimize")
-    region: str = Field(default="US-WEST", description="Grid region for optimization")
+    region: str = Field(
+        default="US-WEST",
+        description="Grid region for optimization, or 'all' for cross-region comparison",
+    )
     optimization_config: OptimizationConfigRequest | None = Field(
         None, description="Optional optimization configuration override"
     )
     forecast_hours: int | None = Field(
         None, ge=1, le=168, description="Forecast horizon in hours (1-168)"
+    )
+    runs_per_week: float | None = Field(
+        None,
+        ge=0.01,
+        le=168,
+        description="Job frequency for annual savings projection (e.g. 1.0=weekly, 5.0=weekdays, 0.14=monthly). Omit to skip annual projection.",
     )
 
 
@@ -57,4 +66,10 @@ class FleetOptimizeRequest(BaseModel):
     )
     forecast_hours: int | None = Field(
         None, ge=1, le=168, description="Forecast horizon in hours (1-168)"
+    )
+    runs_per_week: float | None = Field(
+        None,
+        ge=0.01,
+        le=168,
+        description="Job frequency for annual savings projection. Omit to skip annual projection.",
     )

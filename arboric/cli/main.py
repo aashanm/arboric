@@ -33,6 +33,39 @@ from arboric.core.models import FleetOptimizationResult, Workload, WorkloadType
 # Initialize Rich console
 console = Console()
 
+# Frequency presets and savings calculation
+FREQUENCY_PRESETS = {
+    "daily": 365,
+    "weekdays": 260,  # 5 × 52
+    "weekly": 52,
+    "monthly": 12,
+}
+
+SAVINGS_REALIZATION_RATE = 0.80  # user keeps 80% after performance fee
+
+
+def parse_frequency(value: str) -> float:
+    """Parse frequency string to runs/year.
+
+    Accepts:
+    - Named presets: 'daily', 'weekdays', 'weekly', 'monthly'
+    - Numeric: runs per week (e.g. '3' = 3 times/week)
+
+    Raises ValueError on invalid input.
+    """
+    lower = value.strip().lower()
+    if lower in FREQUENCY_PRESETS:
+        return float(FREQUENCY_PRESETS[lower])
+    try:
+        runs_per_week = float(lower)  # input unit: runs/week (e.g. --frequency 3 = 3×/wk)
+        if runs_per_week <= 0:
+            raise ValueError("Frequency must be greater than 0.")
+        return runs_per_week * 52
+    except ValueError:
+        raise ValueError(
+            f"Unknown frequency '{value}'. Use: daily, weekdays, weekly, monthly, or a number (runs/week)."
+        )
+
 
 def to_local_time(dt):
     """Convert datetime to local timezone (if needed). Naive timestamps are assumed to already be in local time."""
@@ -119,11 +152,18 @@ def create_comparison_table(result) -> Table:
     table.add_column("Yield", style=f"bold {ARBORIC_AMBER}", justify="right", width=14)
 
     # Start time
+    if result.delay_hours > 0:
+        optimal_col = f"{result.optimal_start_clock} (+{result.delay_hours:.1f}h)"
+        yield_col = f"within {result.workload.deadline_hours:.0f}h deadline ✓"
+    else:
+        optimal_col = result.optimal_start_clock
+        yield_col = "Immediate — already optimal"
+
     table.add_row(
         "Start Time",
         format_local_time(result.baseline_start),
-        format_local_time(result.optimal_start),
-        f"+{result.delay_hours:.1f}h delay" if result.delay_hours > 0 else "Immediate",
+        optimal_col,
+        yield_col,
     )
 
     # Avg Price
@@ -160,15 +200,14 @@ def create_comparison_table(result) -> Table:
         f"-{result.carbon_savings_kg:.2f} kg",
     )
 
-    table.add_section()
-
-    # UX note: explain the cost/carbon decoupling
-    table.add_row(
-        "[dim]Note[/dim]",
-        "",
-        "[dim]Cost reflects spot rate × duration. Carbon reflects power × duration × grid intensity.[/dim]",
-        "",
-    )
+    # On-demand rate (if instance was specified)
+    if result.on_demand_rate_per_hr is not None:
+        table.add_row(
+            "On-demand Rate",
+            f"${result.on_demand_rate_per_hr:.2f}/hr",
+            f"${result.on_demand_rate_per_hr:.2f}/hr",
+            "(reference)",
+        )
 
     return table
 
@@ -253,6 +292,81 @@ def simulate_optimization_animation(workload_name: str, duration: float = 1.5):
             progress.advance(task)
 
 
+def _display_region_comparison(comparison, frequency: str | None = None, quiet: bool = False):
+    """Display cross-region temporal comparison results."""
+    if quiet:
+        return
+
+    # Create comparison table
+    table = Table(
+        title="",
+        box=box.ROUNDED,
+        show_header=True,
+        header_style=f"bold {ARBORIC_BLUE}",
+        border_style=ARBORIC_BLUE,
+        padding=(0, 1),
+    )
+
+    table.add_column("Region", style="bold white", width=15)
+    table.add_column("Best Window", style="white", width=12)
+    table.add_column("Spot Rate", style="white", justify="right", width=12)
+    table.add_column("Carbon", style="white", justify="right", width=14)
+    table.add_column("Cost", style="white", justify="right", width=10)
+    table.add_column("You Save", style=f"bold {ARBORIC_GREEN}", justify="right", width=12)
+
+    # Add entries (already sorted cheapest-first)
+    for entry in comparison.entries:
+        region_label = entry.region
+        # Mark cheapest with ⚡ and cleanest with 🌱
+        if entry.region == comparison.cheapest_region:
+            region_label = f"⚡ {region_label}"
+        if entry.region == comparison.cleanest_region:
+            region_label = f"🌱 {region_label}"
+
+        table.add_row(
+            region_label,
+            entry.optimal_start_clock,
+            f"${entry.avg_spot_price:.2f}/hr",
+            f"{entry.avg_carbon:.0f} gCO2/kWh",
+            f"${entry.optimized_cost:.2f}",
+            f"-${entry.cost_savings:.2f}",
+        )
+
+    console.print(Panel(table, title="[bold]Cross-Region Comparison", border_style=ARBORIC_BLUE))
+    console.print()
+
+    # Show comparison summary
+    cheapest_entry = comparison.entries[0]  # Already sorted
+    cleanest_entry = min(comparison.entries, key=lambda e: e.avg_carbon)
+
+    summary_text = (
+        f"[bold {ARBORIC_GREEN}]⚡ Cheapest:[/bold {ARBORIC_GREEN}] {comparison.cheapest_region} "
+        f"at {cheapest_entry.optimal_start_clock}  "
+        f"[bold {ARBORIC_GREEN}]🌱 Cleanest:[/bold {ARBORIC_GREEN}] {comparison.cleanest_region} "
+        f"({cleanest_entry.avg_carbon:.0f} gCO2/kWh)"
+    )
+
+    # Add annual projection if frequency provided
+    if frequency is not None:
+        try:
+            runs_per_year = parse_frequency(frequency)
+        except ValueError as e:
+            raise typer.BadParameter(str(e), param_hint="'--frequency'")
+        annual_savings = cheapest_entry.cost_savings * runs_per_year * SAVINGS_REALIZATION_RATE
+        summary_text += f"\n\n[dim]At {frequency} ({runs_per_year:.0f} runs/year) in {comparison.cheapest_region}, that's ${annual_savings:,.2f}/year[/dim]"
+
+    summary_text += (
+        "\n\n[dim]Cross-region temporal comparison · data egress costs not included[/dim]"
+    )
+
+    summary_panel = Panel(
+        summary_text,
+        border_style=ARBORIC_GREEN,
+        padding=(1, 2),
+    )
+    console.print(summary_panel)
+
+
 @app.command()
 def optimize(
     workload_name: str = typer.Argument(..., help="Name of the workload to optimize"),
@@ -262,13 +376,33 @@ def optimize(
     deadline: float | None = typer.Option(
         None, "--deadline", "-D", help="Must complete within hours"
     ),
-    power: float | None = typer.Option(None, "--power", "-p", help="Power draw in kW"),
     region: str | None = typer.Option(None, "--region", "-r", help="Grid region"),
+    instance_type: str | None = typer.Option(
+        None,
+        "--instance-type",
+        "-i",
+        help="Cloud instance type (e.g., p3.8xlarge). Use with --provider.",
+    ),
+    cloud_provider: str | None = typer.Option(
+        None, "--provider", help="Cloud provider: aws, gcp, or azure. Use with --instance-type."
+    ),
+    frequency: str | None = typer.Option(
+        None,
+        "--frequency",
+        "-f",
+        help="Job frequency for annual projection: daily, weekdays, weekly, monthly, or runs/week (e.g. 3).",
+    ),
+    runs_per_week_deprecated: float | None = typer.Option(
+        None,
+        "--runs-per-week",
+        help="[Deprecated] Use --frequency instead.",
+        hidden=True,
+    ),
     quiet: bool = typer.Option(False, "--quiet", "-q", help="Minimal output"),
     output: str | None = typer.Option(
         None, "--output", "-o", help="Output file path (or '-' for stdout)"
     ),
-    format: str | None = typer.Option(None, "--format", "-f", help="Export format: json, csv"),
+    format: str | None = typer.Option(None, "--format", help="Export format: json, csv"),
     receipt: str | None = typer.Option(
         None, "--receipt", help="Generate certified receipt PDF at path"
     ),
@@ -276,43 +410,100 @@ def optimize(
     """
     Optimize a single workload for cost and carbon efficiency.
 
-    Example: arboric optimize "LLM Training" --duration 6 --deadline 24
+    Example: arboric optimize "LLM Training" --duration 6 --deadline 24 --instance p3.8xlarge --provider aws
 
     Export results: arboric optimize "Job" --output results.json
 
+    Power draw is auto-derived from the instance type if provided, or defaults to 100 kW.
     If options are not specified, values from ~/.arboric/config.yaml will be used.
     """
     # Load configuration for defaults
     cfg = get_config()
 
+    # Handle deprecated --runs-per-week flag
+    if runs_per_week_deprecated is not None:
+        console.print("[yellow]⚠  --runs-per-week is deprecated, use --frequency instead.[/yellow]")
+        if frequency is None:
+            frequency = str(runs_per_week_deprecated)  # treat as numeric runs/week
+
     # Use config defaults if not specified
     duration = duration if duration is not None else cfg.defaults.duration_hours
     deadline = deadline if deadline is not None else cfg.defaults.deadline_hours
-    power = power if power is not None else cfg.defaults.power_draw_kw
     region = region if region is not None else cfg.defaults.region
+    instance_type = instance_type if instance_type is not None else cfg.defaults.instance_type
+    cloud_provider = cloud_provider if cloud_provider is not None else cfg.defaults.cloud_provider
     quiet = quiet or cfg.cli.quiet_mode
 
     if not quiet and cfg.cli.show_banner:
         print_banner()
         console.print()
 
+    # Handle cross-region optimization (--region all → find best across all regions)
+    if region and region.lower() == "all":
+        workload = Workload(
+            name=workload_name,
+            duration_hours=duration,
+            deadline_hours=deadline,
+            workload_type=WorkloadType.ML_TRAINING,
+            instance_type=instance_type,
+            cloud_provider=cloud_provider,
+        )
+        opt_config = OptimizationConfig(
+            cost_weight=cfg.optimization.cost_weight,
+            carbon_weight=cfg.optimization.carbon_weight,
+            min_delay_hours=cfg.optimization.min_delay_hours,
+            prefer_continuous=cfg.optimization.prefer_continuous,
+        )
+        autopilot = Autopilot(config=opt_config)
+        comparison = autopilot.compare_regions(workload)
+
+        # Get the best (cheapest) region
+        best_region = comparison.cheapest_region
+        region = best_region  # Set region for normal flow
+
+        # Display which region was chosen
+        console.print(
+            f"[bold {ARBORIC_GREEN}]✓ Optimal region across all: {best_region}[/bold {ARBORIC_GREEN}]"
+        )
+        console.print()
+
     # Create workload
     workload = Workload(
         name=workload_name,
         duration_hours=duration,
-        power_draw_kw=power,
         deadline_hours=deadline,
         workload_type=WorkloadType.ML_TRAINING,
+        instance_type=instance_type,
+        cloud_provider=cloud_provider,
     )
 
     # Display workload info
+    instance_info = ""
+    power_note = ""
+    if workload.instance_type:
+        from arboric.core.grid_oracle import INSTANCE_PROFILES
+
+        provider_profiles = INSTANCE_PROFILES.get(workload.cloud_provider, {})
+        instance_profile = provider_profiles.get(workload.instance_type)
+        if instance_profile:
+            instance_info = f"""[bold]Instance:[/bold] {workload.instance_type} ({workload.cloud_provider.upper()}) · {instance_profile["gpu"]} · {instance_profile["use_case"]}
+[bold]On-demand:[/bold] ${instance_profile["on_demand"]:.2f}/hr
+"""
+            # Power is auto-derived from instance profile
+            power_note = f"[dim](auto-estimated from {workload.instance_type}: {workload.power_draw_kw} kW)[/dim]"
+        else:
+            instance_info = f"[bold]Instance:[/bold] {workload.instance_type} ({workload.cloud_provider.upper()})\n"
+    else:
+        instance_info = "[bold]Instance:[/bold] Not specified (using default GPU profile)\n"
+
     workload_panel = Panel(
         f"""[bold]Workload:[/bold] {workload.name}
 [bold]Duration:[/bold] {workload.duration_hours}h
-[bold]Power Draw:[/bold] {workload.power_draw_kw} kW
+[bold]Power Draw:[/bold] {workload.power_draw_kw} kW {power_note}
 [bold]Energy:[/bold] {workload.energy_kwh} kWh
 [bold]Deadline:[/bold] {workload.deadline_hours}h from now
-[bold]Region:[/bold] {region}""",
+[bold]Region:[/bold] {region}
+{instance_info}""",
         title="[bold white]Payload Configuration",
         border_style=ARBORIC_PURPLE,
         padding=(1, 2),
@@ -326,7 +517,12 @@ def optimize(
         console.print()
 
     # Get forecast and optimize
-    grid = get_grid(region=region, config=cfg)
+    grid = get_grid(
+        region=region,
+        config=cfg,
+        instance_type=instance_type,
+        cloud_provider=cloud_provider,
+    )
     # Pass appropriate time based on grid type:
     # - MockGrid expects naive local time for correct hour_of_day calculations
     # - LiveGrid expects UTC time (interprets naive datetime as UTC)
@@ -458,14 +654,31 @@ def optimize(
     console.print()
 
     # Show yield summary
+    # Build schedule confirmation line
+    if result.delay_hours > 0:
+        schedule_line = f"⏰ Scheduled for {result.optimal_start_clock} · within your {result.workload.deadline_hours:.0f}h deadline ✓  ({result.deadline_slack_hours:.1f}h slack)"
+    else:
+        schedule_line = "⏰ Starting immediately — already optimal"
+
+    # Build annual savings line if frequency provided
+    annual_line = ""
+    if frequency is not None:
+        try:
+            runs_per_year = parse_frequency(frequency)
+        except ValueError as e:
+            raise typer.BadParameter(str(e), param_hint="'--frequency'")
+        annual_savings = result.cost_savings * runs_per_year * SAVINGS_REALIZATION_RATE
+        annual_line = f"\n[dim]Annual savings estimate: ${annual_savings:,.2f}/year  ({frequency} · {runs_per_year:.0f} runs/year)[/dim]"
+
     yield_panel = Panel(
         Align.center(
             Text.from_markup(
-                f"[bold {ARBORIC_GREEN}]TOTAL YIELD[/bold {ARBORIC_GREEN}]\n\n"
+                f"[bold {ARBORIC_GREEN}]TOTAL YIELD[/bold {ARBORIC_GREEN}]  ·  Region: {region}\n\n"
                 f"[bold white]💰 ${result.cost_savings:.2f} saved[/bold white]  ·  "
                 f"[bold white]🌱 {result.carbon_savings_kg:.2f} kg CO₂ avoided[/bold white]\n\n"
                 f"[dim]Cost reduction: {result.cost_savings_percent:.1f}% | "
-                f"Carbon reduction: {result.carbon_savings_percent:.1f}%[/dim]"
+                f"Carbon reduction: {result.carbon_savings_percent:.1f}%[/dim]\n\n"
+                f"{schedule_line}{annual_line}"
             )
         ),
         border_style=ARBORIC_GREEN,
@@ -483,8 +696,16 @@ def tradeoff(
     deadline: float | None = typer.Option(
         None, "--deadline", "-D", help="Must complete within hours"
     ),
-    power: float | None = typer.Option(None, "--power", "-p", help="Power draw in kW"),
     region: str | None = typer.Option(None, "--region", "-r", help="Grid region"),
+    instance_type: str | None = typer.Option(
+        None,
+        "--instance-type",
+        "-i",
+        help="Cloud instance type (e.g., p3.8xlarge). Use with --provider.",
+    ),
+    cloud_provider: str | None = typer.Option(
+        None, "--provider", help="Cloud provider: aws, gcp, or azure. Use with --instance-type."
+    ),
     points: int = typer.Option(10, "--points", "-n", help="Number of tradeoff points to show"),
     quiet: bool = typer.Option(False, "--quiet", "-q", help="Minimal output"),
 ):
@@ -502,8 +723,9 @@ def tradeoff(
 
     duration = duration if duration is not None else cfg.defaults.duration_hours
     deadline = deadline if deadline is not None else cfg.defaults.deadline_hours
-    power = power if power is not None else cfg.defaults.power_draw_kw
     region = region if region is not None else cfg.defaults.region
+    instance_type = instance_type if instance_type is not None else cfg.defaults.instance_type
+    cloud_provider = cloud_provider if cloud_provider is not None else cfg.defaults.cloud_provider
     quiet = quiet or cfg.cli.quiet_mode
 
     if not quiet and cfg.cli.show_banner:
@@ -513,9 +735,10 @@ def tradeoff(
     workload = Workload(
         name=workload_name,
         duration_hours=duration,
-        power_draw_kw=power,
         deadline_hours=deadline,
         workload_type=WorkloadType.ML_TRAINING,
+        instance_type=instance_type,
+        cloud_provider=cloud_provider,
     )
 
     workload_panel = Panel(
@@ -536,7 +759,12 @@ def tradeoff(
         simulate_optimization_animation(workload_name, duration=1.0)
         console.print()
 
-    grid = get_grid(region=region, config=cfg)
+    grid = get_grid(
+        region=region,
+        config=cfg,
+        instance_type=instance_type,
+        cloud_provider=cloud_provider,
+    )
     # Pass appropriate time based on grid type:
     # - MockGrid expects naive local time for correct hour_of_day calculations
     # - LiveGrid expects UTC time (interprets naive datetime as UTC)
@@ -903,6 +1131,12 @@ minimum cost and carbon emissions.
 def forecast(
     region: str = typer.Option("US-WEST", "--region", "-r", help="Grid region"),
     hours: int = typer.Option(24, "--hours", "-h", help="Forecast hours"),
+    instance_type: str | None = typer.Option(
+        None, "--instance-type", help="Cloud instance type (optional, affects spot pricing)"
+    ),
+    provider: str | None = typer.Option(
+        None, "--provider", "-p", help="Cloud provider: aws, gcp, azure (optional)"
+    ),
     output: str | None = typer.Option(
         None, "--output", "-o", help="Output file path (or '-' for stdout)"
     ),
@@ -922,7 +1156,7 @@ def forecast(
     console.print()
 
     cfg = get_config()
-    grid = get_grid(region=region, config=cfg)
+    grid = get_grid(region=region, config=cfg, instance_type=instance_type, cloud_provider=provider)
     # Pass appropriate time based on grid type:
     # - MockGrid expects naive local time for correct hour_of_day calculations
     # - LiveGrid expects UTC time (interprets naive datetime as UTC)
@@ -934,6 +1168,14 @@ def forecast(
     else:
         now_for_forecast = now_local
     forecast_df = grid.get_forecast(hours=hours, start_time=now_for_forecast)
+
+    # Display parameters being used
+    resolved_instance = instance_type or "default"
+    resolved_provider = provider or "default"
+    console.print(
+        f"[dim]Parameters: region={region}, hours={hours}, instance={resolved_instance}, provider={resolved_provider}[/dim]"
+    )
+    console.print()
 
     # Handle export if requested
     if output:
@@ -980,10 +1222,11 @@ def forecast(
     table.add_column("Status", justify="center", width=20)
 
     for timestamp, row in forecast_df.iterrows():
+        # Price color thresholds (spot instance $/hour)
         price_color = (
             ARBORIC_GREEN
-            if row["price"] < 0.10
-            else (ARBORIC_AMBER if row["price"] < 0.15 else ARBORIC_RED)
+            if row["price"] < 6.0
+            else (ARBORIC_AMBER if row["price"] < 12.0 else ARBORIC_RED)
         )
         carbon_color = (
             ARBORIC_GREEN
@@ -993,11 +1236,11 @@ def forecast(
 
         # Status indicator
         status_parts = []
-        if row["price"] < 12.0:
+        if row["price"] < 6.0:
             status_parts.append("💰 CHEAP")
         if row["co2_intensity"] < 200:
             status_parts.append("🌱 GREEN")
-        if row["price"] > 17.0:
+        if row["price"] > 12.0:
             status_parts.append("⚠️  PEAK")
         if row["co2_intensity"] > 500:
             status_parts.append("🏭 DIRTY")

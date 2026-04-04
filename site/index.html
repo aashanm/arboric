@@ -175,20 +175,61 @@
     };
 
     const REGION_PROFILES = {
-      'US-WEST':  { base_carbon: 350, carbon_amplitude: 200, base_price: 0.12, price_amplitude: 0.08, solar_peak_hour: 13, price_peak_hour: 18 },
-      'US-EAST':  { base_carbon: 420, carbon_amplitude: 150, base_price: 0.14, price_amplitude: 0.07, solar_peak_hour: 13, price_peak_hour: 17 },
-      'EU-WEST':  { base_carbon: 280, carbon_amplitude: 180, base_price: 0.18, price_amplitude: 0.10, solar_peak_hour: 14, price_peak_hour: 19 },
-      'NORDIC':   { base_carbon: 80,  carbon_amplitude: 40,  base_price: 0.08, price_amplitude: 0.04, solar_peak_hour: 13, price_peak_hour: 18 },
+      'US-WEST':  { base_carbon: 350, carbon_amplitude: 200, solar_peak_hour: 13, on_demand_rate_per_hr: 24.00, spot_floor_discount: 0.58, spot_peak_discount: 0.25, contention_peak_hour: 14 },
+      'US-EAST':  { base_carbon: 420, carbon_amplitude: 150, solar_peak_hour: 13, on_demand_rate_per_hr: 22.00, spot_floor_discount: 0.55, spot_peak_discount: 0.20, contention_peak_hour: 14 },
+      'EU-WEST':  { base_carbon: 280, carbon_amplitude: 180, solar_peak_hour: 14, on_demand_rate_per_hr: 20.00, spot_floor_discount: 0.50, spot_peak_discount: 0.15, contention_peak_hour: 13 },
+      'NORDIC':   { base_carbon: 80,  carbon_amplitude: 40,  solar_peak_hour: 13, on_demand_rate_per_hr: 18.00, spot_floor_discount: 0.60, spot_peak_discount: 0.30, contention_peak_hour: 13 },
     };
 
+    const INSTANCE_PROFILES = {
+      'aws': {
+        'p3.2xlarge':    { on_demand: 3.06,  spot_floor_discount: 0.70, gpu: 'V100 (1x)',  use_case: 'ML training / inference' },
+        'p3.8xlarge':    { on_demand: 12.24, spot_floor_discount: 0.68, gpu: 'V100 (4x)',  use_case: 'Distributed training' },
+        'p3.16xlarge':   { on_demand: 24.48, spot_floor_discount: 0.65, gpu: 'V100 (8x)',  use_case: 'Large model training' },
+        'p4d.24xlarge':  { on_demand: 32.77, spot_floor_discount: 0.60, gpu: 'A100 (8x)',  use_case: 'Foundation model training' },
+        'g5.xlarge':     { on_demand: 1.006, spot_floor_discount: 0.72, gpu: 'A10G (1x)',  use_case: 'Inference / fine-tuning' },
+        'g5.12xlarge':   { on_demand: 5.672, spot_floor_discount: 0.68, gpu: 'A10G (4x)',  use_case: 'Mid-scale training' },
+        'g4dn.xlarge':   { on_demand: 0.526, spot_floor_discount: 0.75, gpu: 'T4 (1x)',    use_case: 'Inference / small training' },
+        'g4dn.12xlarge': { on_demand: 3.912, spot_floor_discount: 0.71, gpu: 'T4 (4x)',    use_case: 'Batch inference' },
+      },
+      'gcp': {
+        'n1-standard-8-v100': { on_demand: 2.48,  spot_floor_discount: 0.72, gpu: 'V100 (1x)', use_case: 'ML training' },
+        'a2-highgpu-1g':      { on_demand: 3.67,  spot_floor_discount: 0.67, gpu: 'A100 (1x)', use_case: 'Training / inference' },
+        'a2-highgpu-4g':      { on_demand: 14.69, spot_floor_discount: 0.65, gpu: 'A100 (4x)', use_case: 'Distributed training' },
+        'a2-highgpu-8g':      { on_demand: 29.39, spot_floor_discount: 0.63, gpu: 'A100 (8x)', use_case: 'Large model training' },
+        'g2-standard-4':      { on_demand: 0.90,  spot_floor_discount: 0.73, gpu: 'L4 (1x)',   use_case: 'Inference' },
+        'g2-standard-16':     { on_demand: 3.59,  spot_floor_discount: 0.70, gpu: 'L4 (4x)',   use_case: 'Batch inference' },
+      },
+      'azure': {
+        'Standard_NC6s_v3':      { on_demand: 3.06,  spot_floor_discount: 0.68, gpu: 'V100 (1x)', use_case: 'ML training' },
+        'Standard_NC24s_v3':     { on_demand: 12.24, spot_floor_discount: 0.65, gpu: 'V100 (4x)', use_case: 'Distributed training' },
+        'Standard_ND96asr_v4':   { on_demand: 27.20, spot_floor_discount: 0.60, gpu: 'A100 (8x)', use_case: 'Foundation model training' },
+        'Standard_NC4as_T4_v3':  { on_demand: 0.526, spot_floor_discount: 0.74, gpu: 'T4 (1x)',   use_case: 'Inference' },
+        'Standard_NC16as_T4_v3': { on_demand: 1.204, spot_floor_discount: 0.71, gpu: 'T4 (4x)',   use_case: 'Batch inference' },
+      },
+    };
+
+    const DEFAULT_INSTANCE = { on_demand: 12.24, spot_floor_discount: 0.68 };
+
     // Normalization ceilings from autopilot.py _calculate_window_score
-    const PRICE_CEILING = 0.30;
+    const PRICE_CEILING = 35.0;
     const CARBON_CEILING = 600;
     const DEFAULT_PRICE_WEIGHT = 0.7;
     const DEFAULT_CARBON_WEIGHT = 0.3;
 
     // Performance fee from pitch doc
     const PERFORMANCE_FEE = 0.20;
+
+    // Savings realization rate (user keeps 80% after performance fee)
+    const SAVINGS_REALIZATION_RATE = 0.80;
+
+    // Frequency presets for annual projection
+    const FREQUENCY_PRESETS = {
+      daily: 365,
+      weekdays: 260,  // 5 × 52
+      weekly: 52,
+      monthly: 12,
+    };
 
     // SB 253 deadline
     const SB253_DEADLINE = new Date('2027-01-01T00:00:00');
@@ -216,9 +257,15 @@
     /* ================================================================
        GRID ORACLE — ported from grid_oracle.py
        ================================================================ */
-    function createMockGrid(region, seed = 42) {
+    function createMockGrid(region, seed = 42, instanceType = null, provider = null) {
       const profile = REGION_PROFILES[region];
       if (!profile) throw new Error(`Unknown region: ${region}`);
+
+      // Resolve instance profile
+      let instanceProfile = DEFAULT_INSTANCE;
+      if (provider && instanceType && INSTANCE_PROFILES[provider]) {
+        instanceProfile = INSTANCE_PROFILES[provider][instanceType] || DEFAULT_INSTANCE;
+      }
 
       const rng = mulberry32(seed);
       const dailyCarbonShift = rng() * 60 - 30;       // uniform(-30, 30)
@@ -250,18 +297,35 @@
       }
 
       function calcPrice(hour) {
-        const sf = calcSolarFactor(hour);
-        const solarDrop = profile.price_amplitude * 1.5 * sf;
-        let evening = 0;
-        if (hour >= 15 && hour <= 22) {
-          const d = Math.abs(hour - 18.5);
-          evening = profile.price_amplitude * 1.2 * Math.exp(-d * d / (2 * 2 * 2));
+        const onDemand = instanceProfile.on_demand;
+        const floorPrice = onDemand * (1 - instanceProfile.spot_floor_discount);
+        const peakPrice = onDemand * (1 - profile.spot_peak_discount);
+        const priceRange = peakPrice - floorPrice;
+        const contentionPeak = profile.contention_peak_hour;
+        const contentionWidth = 5.0;
+
+        // Business-hours contention spike (Gaussian centered at peak hour)
+        const distance = Math.abs(hour - contentionPeak);
+        const contentionComponent = priceRange * Math.exp(-(distance * distance) / (2 * contentionWidth * contentionWidth));
+
+        // Morning ramp-up (6am-9am, linear)
+        let rampComponent = 0;
+        if (hour >= 6 && hour < 9) {
+          rampComponent = priceRange * 0.35 * ((hour - 6) / 3.0);
         }
-        let night = 0;
-        if (hour < 6 || hour > 22) night = profile.price_amplitude * 0.3;
-        const noise = seededGauss(rng, 0, 0.005);
-        const val = profile.base_price - solarDrop + evening + night + dailyPriceShift + noise;
-        return Math.max(0.02, Math.min(0.50, val));
+
+        // Evening decay (6pm-10pm, linear fall-off)
+        let eveningComponent = 0;
+        if (hour > 18 && hour <= 22) {
+          eveningComponent = priceRange * 0.4 * (1 - (hour - 18) / 4.0);
+        }
+
+        // Random market noise (~1% of on-demand rate)
+        const noise = seededGauss(rng, 0, onDemand * 0.01);
+        const price = floorPrice + contentionComponent + rampComponent + eveningComponent + noise;
+
+        // Clamp: allow slight undercut below floor due to noise, never exceed on-demand
+        return Math.max(floorPrice * 0.85, Math.min(onDemand, price));
       }
 
       function calcRenewable(hour) {
@@ -274,6 +338,9 @@
       }
 
       function getForecast(hours, startHour = 18) {
+        const floorPrice = instanceProfile.on_demand * (1 - instanceProfile.spot_floor_discount) * 0.85;
+        const ceilingPrice = instanceProfile.on_demand;
+
         const data = [];
         for (let i = 0; i < hours; i++) {
           const h = (startHour + i) % 24;
@@ -281,7 +348,7 @@
           let co2 = calcCarbon(h) * trendFactor;
           let price = calcPrice(h) * trendFactor;
           co2 = Math.max(50, Math.min(800, co2));
-          price = Math.max(0.02, Math.min(0.50, price));
+          price = Math.max(floorPrice, Math.min(ceilingPrice, price));
           data.push({
             hour: i,
             hourOfDay: h,
@@ -294,7 +361,7 @@
         return data;
       }
 
-      return { getForecast, profile };
+      return { getForecast, profile, instanceProfile };
     }
 
     /* ================================================================
@@ -308,7 +375,7 @@
       const baselineSlice = forecast.slice(0, windowsNeeded);
       const baselineAvgPrice = baselineSlice.reduce((s, w) => s + w.price, 0) / baselineSlice.length;
       const baselineAvgCarbon = baselineSlice.reduce((s, w) => s + w.co2_intensity, 0) / baselineSlice.length;
-      const baselineCost = baselineAvgPrice * energyKwh;
+      const baselineCost = baselineAvgPrice * durationHours;
       const baselineCarbonKg = (baselineAvgCarbon * energyKwh) / 1000;
 
       function scoreWindow(slice) {
@@ -320,7 +387,7 @@
           score: pNorm * DEFAULT_PRICE_WEIGHT + cNorm * DEFAULT_CARBON_WEIGHT,
           avgPrice: avgP,
           avgCarbon: avgC,
-          cost: avgP * energyKwh,
+          cost: avgP * durationHours,
           carbonKg: (avgC * energyKwh) / 1000,
         };
       }
@@ -346,6 +413,29 @@
         }
       }
 
+      // Cost constraint: if composite score recommends a more expensive window, fall back to minimum cost
+      let costConstrained = false;
+      if (bestMetrics.cost > baselineCost) {
+        let minCost = Infinity;
+        let minIdx = 0;
+        let minMetrics = scoreWindow(baselineSlice);
+
+        for (let i = 0; i <= maxStartIdx; i++) {
+          const slice = forecast.slice(i, i + windowsNeeded);
+          if (slice.length < windowsNeeded) break;
+          const m = scoreWindow(slice);
+          if (m.cost < minCost) {
+            minCost = m.cost;
+            minIdx = i;
+            minMetrics = m;
+          }
+        }
+
+        bestIdx = minIdx;
+        bestMetrics = minMetrics;
+        costConstrained = true;
+      }
+
       return {
         baselineCost,
         baselineCarbonKg,
@@ -363,6 +453,7 @@
         optimalStartIdx: bestIdx,
         windowsNeeded,
         energyKwh,
+        costConstrained,
       };
     }
 
@@ -474,7 +565,7 @@
 
     /* ---- Hero Chart (SVG) ---- */
     const HeroChart = memo(function HeroChart() {
-      const grid = createMockGrid('US-WEST', 42);
+      const grid = createMockGrid('US-WEST', 42, 'p3.8xlarge', 'aws');
       const data = grid.getForecast(24, 18);
 
       const W = 600, H = 200, PAD = { t: 20, r: 50, b: 30, l: 50 };
@@ -554,7 +645,7 @@
 
           {/* Legend */}
           <line x1={PAD.l} y1={H - 2} x2={PAD.l + 20} y2={H - 2} stroke={BRAND.amber} strokeWidth="2"/>
-          <text x={PAD.l + 24} y={H} fill="#a3a3a3" fontSize="8" fontFamily="monospace">$/kWh</text>
+          <text x={PAD.l + 24} y={H} fill="#a3a3a3" fontSize="8" fontFamily="monospace">$/hr</text>
           <line x1={PAD.l + 70} y1={H - 2} x2={PAD.l + 90} y2={H - 2} stroke={BRAND.red} strokeWidth="2"/>
           <text x={PAD.l + 94} y={H} fill="#a3a3a3" fontSize="8" fontFamily="monospace">gCO2/kWh</text>
         </svg>
@@ -1015,6 +1106,9 @@
       const [power, setPower] = useState(120);
       const [deadline, setDeadline] = useState(24);
       const [region, setRegion] = useState('US-WEST');
+      const [provider, setProvider] = useState('aws');
+      const [instanceType, setInstanceType] = useState('p3.8xlarge');
+      const [frequency, setFrequency] = useState('daily');
 
       const dDuration = useDebounce(duration, 150);
       const dPower = useDebounce(power, 150);
@@ -1022,17 +1116,18 @@
 
       const result = useMemo(() => {
         const safeDeadline = Math.max(dDeadline, dDuration + 1);
-        const grid = createMockGrid(region, 42);
+        const grid = createMockGrid(region, 42, instanceType, provider);
         const forecast = grid.getForecast(safeDeadline + dDuration + 4, 18);
         return optimizeSchedule(forecast, dDuration, dPower, safeDeadline);
-      }, [dDuration, dPower, dDeadline, region]);
+      }, [dDuration, dPower, dDeadline, region, provider, instanceType]);
 
       const animCostSavings = useAnimatedNumber(result.costSavings, 800, 2);
       const animCarbonSavings = useAnimatedNumber(result.carbonSavingsKg, 800, 1);
       const animCostPct = useAnimatedNumber(result.costSavingsPercent, 600, 1);
       const animCarbonPct = useAnimatedNumber(result.carbonSavingsPercent, 600, 1);
 
-      const annualSavings = result.costSavings * 0.80 * 365;
+      const runsPerYear = FREQUENCY_PRESETS[frequency];
+      const annualSavings = result.costSavings * SAVINGS_REALIZATION_RATE * runsPerYear;
       const youPay = result.costSavings * PERFORMANCE_FEE;
 
       return (
@@ -1044,7 +1139,7 @@
             </p>
 
             {/* Inputs */}
-            <div className="mt-12 grid sm:grid-cols-2 lg:grid-cols-4 gap-6">
+            <div className="mt-12 grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
               <div>
                 <label className="block text-sm text-neutral-400 mb-2" htmlFor="calc-duration">
                   Duration <span className="text-white font-mono font-bold">{duration}h</span>
@@ -1052,15 +1147,6 @@
                 <input id="calc-duration" type="range" min="1" max="24" step="1" value={duration}
                   onChange={e => setDuration(+e.target.value)}
                   aria-label={`Workload duration: ${duration} hours`}
-                  className="w-full"/>
-              </div>
-              <div>
-                <label className="block text-sm text-neutral-400 mb-2" htmlFor="calc-power">
-                  Power Draw <span className="text-white font-mono font-bold">{power} kW</span>
-                </label>
-                <input id="calc-power" type="range" min="10" max="500" step="10" value={power}
-                  onChange={e => setPower(+e.target.value)}
-                  aria-label={`Power draw: ${power} kilowatts`}
                   className="w-full"/>
               </div>
               <div>
@@ -1082,6 +1168,46 @@
               </div>
             </div>
 
+            {/* Configuration */}
+            <div className="mt-6 grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
+              <div>
+                <label className="block text-sm text-neutral-400 mb-2" htmlFor="calc-frequency">Frequency</label>
+                <select id="calc-frequency" value={frequency} onChange={e => setFrequency(e.target.value)}
+                  aria-label="Job frequency"
+                  className="w-full bg-surface border border-border rounded-lg px-4 py-2.5 text-white font-mono text-sm">
+                  <option value="daily">Daily</option>
+                  <option value="weekdays">Weekdays (5×/wk)</option>
+                  <option value="weekly">Weekly</option>
+                  <option value="monthly">Monthly</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm text-neutral-400 mb-2" htmlFor="calc-provider">Cloud Provider</label>
+                <select id="calc-provider" value={provider} onChange={e => {
+                  setProvider(e.target.value);
+                  if (INSTANCE_PROFILES[e.target.value]) {
+                    setInstanceType(Object.keys(INSTANCE_PROFILES[e.target.value])[0]);
+                  }
+                }}
+                  aria-label="Cloud provider"
+                  className="w-full bg-surface border border-border rounded-lg px-4 py-2.5 text-white font-mono text-sm">
+                  <option value="aws">AWS</option>
+                  <option value="gcp">GCP</option>
+                  <option value="azure">Azure</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm text-neutral-400 mb-2" htmlFor="calc-instance">Instance Type</label>
+                <select id="calc-instance" value={instanceType} onChange={e => setInstanceType(e.target.value)}
+                  aria-label="Instance type"
+                  className="w-full bg-surface border border-border rounded-lg px-4 py-2.5 text-white font-mono text-sm">
+                  {INSTANCE_PROFILES[provider] && Object.entries(INSTANCE_PROFILES[provider]).map(([key, val]) => (
+                    <option key={key} value={key}>{key} — {val.gpu}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
             {/* Results Comparison */}
             <div className="mt-10 grid md:grid-cols-2 gap-6">
               {/* Without Arboric */}
@@ -1089,8 +1215,8 @@
                 <h3 className="text-sm font-semibold text-red-400 uppercase tracking-wide mb-4">Without Arboric</h3>
                 <div className="space-y-3">
                   <div className="flex justify-between text-sm">
-                    <span className="text-neutral-400">Cost Signal</span>
-                    <span className="text-white font-mono">${result.baselineAvgPrice.toFixed(4)}</span>
+                    <span className="text-neutral-400">Avg Price</span>
+                    <span className="text-white font-mono">${result.baselineAvgPrice.toFixed(2)}/hr</span>
                   </div>
                   <div className="flex justify-between text-sm">
                     <span className="text-neutral-400">Total Cost</span>
@@ -1112,8 +1238,8 @@
                 <h3 className="text-sm font-semibold text-green-400 uppercase tracking-wide mb-4">With Arboric</h3>
                 <div className="space-y-3">
                   <div className="flex justify-between text-sm">
-                    <span className="text-neutral-400">Cost Signal</span>
-                    <span className="text-green-400 font-mono">${result.optimizedAvgPrice.toFixed(4)}</span>
+                    <span className="text-neutral-400">Avg Price</span>
+                    <span className="text-green-400 font-mono">${result.optimizedAvgPrice.toFixed(2)}/hr</span>
                   </div>
                   <div className="flex justify-between text-sm">
                     <span className="text-neutral-400">Total Cost</span>
@@ -1157,7 +1283,7 @@
               </p>
               {annualSavings > 0 && (
                 <p className="mt-4 text-xl md:text-2xl font-bold text-white">
-                  At this usage running daily, that's{' '}
+                  At this usage running {frequency}, that's{' '}
                   <span className="text-green-400 font-mono">${Math.round(annualSavings).toLocaleString()}/year</span>{' '}
                   you're leaving on the table.
                 </p>

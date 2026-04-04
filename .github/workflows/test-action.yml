@@ -36,7 +36,8 @@ jobs:
         with:
           job-name: 'Nightly Model Training'
           duration: '8'
-          power-kw: '120'
+          instance-type: 'p3.8xlarge'
+          provider: 'aws'
           deadline: '24'
           region: 'US-WEST'
           live-api-username: ${{ secrets.LIVE_API_USERNAME || '' }}
@@ -64,7 +65,8 @@ jobs:
         with:
           job-name: 'PR Test Job'
           duration: '2'
-          power-kw: '75'
+          instance-type: 'p3.2xlarge'
+          provider: 'aws'
           comment-on-pr: 'true'
           github-token: ${{ secrets.GITHUB_TOKEN }}
 

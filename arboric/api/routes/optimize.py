@@ -9,7 +9,10 @@ from fastapi import APIRouter, Depends, HTTPException, status
 
 from arboric.api.dependencies import get_autopilot
 from arboric.api.models.requests import OptimizeRequest
-from arboric.api.utils import create_api_response, serialize_schedule_for_api
+from arboric.api.utils import (
+    create_api_response,
+    serialize_schedule_for_api,
+)
 from arboric.core.autopilot import Autopilot
 from arboric.core.config import get_config
 from arboric.core.grid_oracle import get_grid
@@ -40,8 +43,20 @@ async def optimize_workload(
         HTTPException: 400 for business logic errors, 500 for unexpected errors
     """
     try:
+        # Check for region="all" (find optimal region)
+        region = request.region
+        if region.lower() == "all":
+            comparison = autopilot.compare_regions(request.workload)
+            # Use cheapest region for optimization
+            region = comparison.cheapest_region
+
         # Get grid forecast
-        grid = get_grid(region=request.region, config=get_config())
+        grid = get_grid(
+            region=region,
+            config=get_config(),
+            instance_type=request.workload.instance_type,
+            cloud_provider=request.workload.cloud_provider,
+        )
         forecast_hours = request.forecast_hours or 48
         # Pass appropriate time based on grid type
         now_local = datetime.now().replace(minute=0, second=0, microsecond=0)
@@ -54,8 +69,8 @@ async def optimize_workload(
         # Run optimization
         result = autopilot.optimize_schedule(request.workload, forecast)
 
-        # Serialize and return
-        data = serialize_schedule_for_api(result)
+        # Serialize and return (pass region and runs_per_week)
+        data = serialize_schedule_for_api(result, request.runs_per_week, region=region)
         return create_api_response("optimize", data)
 
     except ValueError as e:

@@ -18,6 +18,7 @@ import pandas as pd
 
 from arboric.core.models import (
     FleetOptimizationResult,
+    RegionComparisonResult,
     ScheduleResult,
     Workload,
     WorkloadPriority,
@@ -30,7 +31,8 @@ DEFAULT_CARBON_WEIGHT = 0.3
 
 # Normalization ceiling for spot instance pricing
 # Represents a "bad" spot price equivalent to on-demand rate
-SPOT_PRICE_NORMALIZATION_CEILING = 25.0  # $/hr
+# Raised to 35.0 to cover highest-tier GPU on-demand (p4d.24xlarge: $32.77/hr)
+SPOT_PRICE_NORMALIZATION_CEILING = 35.0  # $/hr
 
 
 class OptimizationConfig:
@@ -196,6 +198,7 @@ class Autopilot:
                 baseline_carbon_kg=baseline_carbon,
                 baseline_avg_price=baseline_slice["price"].mean(),
                 baseline_avg_carbon=baseline_slice["co2_intensity"].mean(),
+                cost_constrained=False,
             )
 
         # Calculate baseline (immediate start)
@@ -248,17 +251,53 @@ class Autopilot:
                 best_cost = cost
                 best_carbon = carbon
 
+        # Check cost constraint: optimized cost must not exceed baseline cost
+        cost_constrained = False
+        if best_cost > baseline_cost:
+            self._log(
+                f"⚠️  Cost constraint violated: composite score recommended "
+                f"${best_cost:.2f} (higher than baseline ${baseline_cost:.2f})"
+            )
+            self._log("Falling back to minimum-cost window...")
+
+            # Find window with minimum cost (ignoring composite score)
+            min_cost_idx = 0
+            min_cost = baseline_cost
+            min_cost_carbon = baseline_carbon
+
+            for start_idx, score, cost, carbon in scores_by_hour:
+                if cost < min_cost:
+                    min_cost = cost
+                    min_cost_idx = start_idx
+                    min_cost_carbon = carbon
+
+            best_start_idx = min_cost_idx
+            best_cost = min_cost
+            best_carbon = min_cost_carbon
+            cost_constrained = True
+
+            self._log(
+                f"Cost constraint fallback: ${best_cost:.2f} (${baseline_cost - best_cost:.2f} savings)"
+            )
+
         # Find optimal window details
         optimal_start = forecast_df.index[best_start_idx]
         optimal_end = optimal_start + timedelta(hours=workload.duration_hours)
         optimal_slice = forecast_df.iloc[best_start_idx : best_start_idx + windows_needed]
 
         self._log(f"Optimal start: {optimal_start.strftime('%Y-%m-%d %H:%M')}")
-        self._log(f"Optimal score: {best_score:.2f} (${best_cost:.2f}, {best_carbon:.2f}kg CO2)")
+        self._log(f"Optimal cost: ${best_cost:.2f}, carbon: {best_carbon:.2f}kg CO2")
 
         if best_start_idx > 0:
             delay_hours = (optimal_start - baseline_start).total_seconds() / 3600
             self._log(f"Delaying workload by {delay_hours:.1f} hours for optimization")
+
+        # Extract on-demand rate if instance was specified
+        on_demand_rate = (
+            forecast_df["on_demand_rate"].iloc[0]
+            if "on_demand_rate" in forecast_df.columns
+            else None
+        )
 
         return ScheduleResult(
             workload=workload,
@@ -274,6 +313,8 @@ class Autopilot:
             baseline_carbon_kg=baseline_carbon,
             baseline_avg_price=baseline_avg_price,
             baseline_avg_carbon=baseline_avg_carbon,
+            on_demand_rate_per_hr=on_demand_rate,
+            cost_constrained=cost_constrained,
         )
 
     def optimize_fleet(
@@ -596,6 +637,65 @@ class Autopilot:
             return result
 
         return []
+
+    def compare_regions(
+        self,
+        workload: Workload,
+        regions: list[str] | None = None,
+        seed: int | None = None,
+    ) -> "RegionComparisonResult":
+        """
+        Run temporal optimization independently for each region and return ranked comparison.
+        Does not model data egress costs — caller decides if spatial shift is viable.
+
+        Args:
+            workload: The workload to optimize
+            regions: List of regions to compare (default: all 4 REGION_PROFILES keys)
+            seed: Random seed for forecast generation (optional)
+
+        Returns:
+            RegionComparisonResult with entries sorted by cost (cheapest first)
+        """
+        from arboric.core.grid_oracle import REGION_PROFILES, get_grid
+        from arboric.core.models import RegionComparisonResult, RegionScheduleEntry
+
+        regions = regions or list(REGION_PROFILES.keys())
+        entries = []
+
+        for region in regions:
+            grid = get_grid(
+                region=region,
+                instance_type=workload.instance_type,
+                cloud_provider=workload.cloud_provider,
+                seed=seed,
+            )
+            forecast = grid.get_forecast(hours=int(workload.deadline_hours) + 4)
+            result = self.optimize_schedule(workload, forecast)
+            entries.append(
+                RegionScheduleEntry(
+                    region=region,
+                    optimal_start_clock=result.optimal_start_clock,
+                    delay_hours=result.delay_hours,
+                    avg_spot_price=result.optimized_avg_price,
+                    avg_carbon=result.optimized_avg_carbon,
+                    optimized_cost=result.optimized_cost,
+                    optimized_carbon_kg=result.optimized_carbon_kg,
+                    cost_savings=result.cost_savings,
+                    cost_savings_percent=result.cost_savings_percent,
+                    carbon_savings_kg=result.carbon_savings_kg,
+                    carbon_savings_percent=result.carbon_savings_percent,
+                    on_demand_rate_per_hr=result.on_demand_rate_per_hr,
+                )
+            )
+
+        entries.sort(key=lambda e: e.optimized_cost)
+        return RegionComparisonResult(
+            workload_name=workload.name,
+            duration_hours=workload.duration_hours,
+            entries=entries,
+            cheapest_region=entries[0].region,
+            cleanest_region=min(entries, key=lambda e: e.avg_carbon).region,
+        )
 
 
 def create_autopilot(

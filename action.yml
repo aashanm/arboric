@@ -17,10 +17,15 @@ inputs:
     required: false
     default: '4'
 
-  power-kw:
-    description: 'Power draw in kilowatts'
+  instance-type:
+    description: 'Cloud instance type (e.g., p3.8xlarge); power is auto-derived'
     required: false
-    default: '50'
+    default: ''
+
+  provider:
+    description: 'Cloud provider (aws, gcp, azure)'
+    required: false
+    default: 'aws'
 
   deadline:
     description: 'Job must complete within N hours from now'
@@ -95,14 +100,11 @@ runs:
       run: |
         JOB="${{ inputs.job-name }}"
         JOB="${JOB:-${GITHUB_WORKFLOW}}"
-        arboric optimize "$JOB" \
-          --duration "${{ inputs.duration }}" \
-          --power "${{ inputs.power-kw }}" \
-          --deadline "${{ inputs.deadline }}" \
-          --region "${{ inputs.region }}" \
-          --quiet \
-          --output "${RUNNER_TEMP}/arboric.json" \
-          --format json
+        CMD="arboric optimize \"\$JOB\" --duration \"${{ inputs.duration }}\" --deadline \"${{ inputs.deadline }}\" --region \"${{ inputs.region }}\" --quiet --output \"\${RUNNER_TEMP}/arboric.json\" --format json"
+        if [ -n "${{ inputs.instance-type }}" ]; then
+          CMD="$CMD --instance-type \"${{ inputs.instance-type }}\" --provider \"${{ inputs.provider }}\""
+        fi
+        eval "$CMD"
 
     - name: Parse outputs
       id: parse
