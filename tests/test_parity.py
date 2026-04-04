@@ -238,9 +238,9 @@ class TestParityOptimization:
         python_delay = (
             python_result.optimal_start - python_result.baseline_start
         ).total_seconds() / 3600
-        assert (
-            pytest.approx(python_delay, rel=0.1, abs=0.5) == js_result["delayHours"]
-        ), f"Delay mismatch: Python={python_delay}h, JS={js_result['delayHours']}h"
+        assert pytest.approx(python_delay, rel=0.1, abs=0.5) == js_result["delayHours"], (
+            f"Delay mismatch: Python={python_delay}h, JS={js_result['delayHours']}h"
+        )
 
     def test_parity_cost_focused(self, parity_forecast, parity_forecast_as_list):
         """Test parity with cost-focused weights (100% cost, 0% carbon)."""
