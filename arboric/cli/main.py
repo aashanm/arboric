@@ -434,6 +434,16 @@ def optimize(
     cloud_provider = cloud_provider if cloud_provider is not None else cfg.defaults.cloud_provider
     quiet = quiet or cfg.cli.quiet_mode
 
+    # Normalize legacy region aliases to Azure ARM IDs
+    _region_aliases = {
+        "us-west": "westus2",
+        "us-east": "eastus",
+        "eu-west": "uksouth",
+        "nordic": "northeurope",
+    }
+    if region and region.lower() in _region_aliases:
+        region = _region_aliases[region.lower()]
+
     if not quiet and cfg.cli.show_banner:
         print_banner()
         console.print()
@@ -727,6 +737,16 @@ def tradeoff(
     instance_type = instance_type if instance_type is not None else cfg.defaults.instance_type
     cloud_provider = cloud_provider if cloud_provider is not None else cfg.defaults.cloud_provider
     quiet = quiet or cfg.cli.quiet_mode
+
+    # Normalize legacy region aliases to Azure ARM IDs
+    _region_aliases = {
+        "us-west": "westus2",
+        "us-east": "eastus",
+        "eu-west": "uksouth",
+        "nordic": "northeurope",
+    }
+    if region and region.lower() in _region_aliases:
+        region = _region_aliases[region.lower()]
 
     if not quiet and cfg.cli.show_banner:
         print_banner()

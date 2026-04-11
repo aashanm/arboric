@@ -33,9 +33,9 @@ inputs:
     default: '24'
 
   region:
-    description: 'Grid region (US-WEST, US-EAST, EU-WEST, NORDIC)'
+    description: 'Grid region (westus2, eastus, uksouth, northeurope)'
     required: false
-    default: 'US-WEST'
+    default: 'westus2'
 
   live-api-username:
     description: '[Optional] Live data API username'

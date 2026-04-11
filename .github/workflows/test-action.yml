@@ -39,7 +39,7 @@ jobs:
           instance-type: 'p3.8xlarge'
           provider: 'aws'
           deadline: '24'
-          region: 'US-WEST'
+          region: 'westus2'
           live-api-username: ${{ secrets.LIVE_API_USERNAME || '' }}
           live-api-password: ${{ secrets.LIVE_API_PASSWORD || '' }}
 
