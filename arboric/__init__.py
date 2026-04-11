@@ -17,7 +17,7 @@ Usage:
     )
 
     # Get grid forecast
-    grid = MockGrid(region="US-WEST")
+    grid = MockGrid(region="eastus")
     forecast = grid.get_forecast(hours=24)
 
     # Optimize scheduling

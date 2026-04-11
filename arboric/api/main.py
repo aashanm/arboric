@@ -4,6 +4,7 @@ Arboric REST API Server
 FastAPI application providing HTTP endpoints for workload optimization.
 """
 
+import logging
 from datetime import datetime
 
 from fastapi import FastAPI, Request
@@ -13,6 +14,8 @@ from fastapi.responses import JSONResponse
 from pydantic import ValidationError
 
 from arboric.api.routes import config, fleet, forecast, history, optimize, receipt, status
+
+logger = logging.getLogger(__name__)
 
 # Create FastAPI app
 app = FastAPI(
@@ -61,6 +64,51 @@ app.include_router(forecast.router, prefix="/api/v1", tags=["Forecast"])
 app.include_router(status.router, prefix="/api/v1", tags=["Status"])
 app.include_router(config.router, prefix="/api/v1", tags=["Configuration"])
 app.include_router(history.router, prefix="/api/v1", tags=["History"])
+
+# Conditionally load cloud routes if arboric-cloud is installed
+try:
+    from arboric_cloud.api.routes import auth as auth_route
+    from arboric_cloud.api.routes import dashboard as dashboard_route
+    from arboric_cloud.api.routes import jobs, receipts_ext, signals
+    from arboric_cloud.scheduler.receipt_builder import build_and_save_receipt, store_forecast
+    from arboric_cloud.scheduler.store import init_db, list_jobs
+    from arboric_cloud.signals.carbon import build_48h_forecast_df
+
+    app.include_router(jobs.router, prefix="/api/v1", tags=["Scheduler"])
+    app.include_router(signals.router, prefix="/api/v1/signals", tags=["Signals"])
+    app.include_router(receipts_ext.router, prefix="/api/v1/receipts", tags=["Receipts"])
+    app.include_router(auth_route.router, tags=["Auth"])
+    app.include_router(dashboard_route.router, tags=["Dashboard"])
+
+    @app.on_event("startup")
+    async def _repair_missing_receipts() -> None:
+        """Auto-regenerate receipts for COMPLETE jobs that are missing a PDF."""
+        try:
+            from arboric.api.dependencies import get_arboric_config
+
+            init_db()
+            config_obj = get_arboric_config()
+            jobs_list = list_jobs(limit=200)
+            missing = [
+                j for j in jobs_list if j.get("status") == "COMPLETE" and not j.get("receipt_path")
+            ]
+            if not missing:
+                return
+            logger.info("Repairing %d job(s) missing receipts on startup", len(missing))
+            for job in missing:
+                try:
+                    region = job.get("optimal_region") or "northeurope"
+                    df = build_48h_forecast_df(region, config_obj)
+                    store_forecast(job["id"], df)
+                    build_and_save_receipt(job["id"], config_obj)
+                    logger.info("Repaired receipt for job %s", job["id"])
+                except Exception as exc:
+                    logger.warning("Could not repair receipt for job %s: %s", job["id"], exc)
+        except Exception as exc:
+            logger.warning("Startup receipt repair skipped: %s", exc)
+
+except ImportError:
+    logger.debug("arboric-cloud not installed — scheduler, signals, and dashboard routes disabled")
 
 
 # Root endpoint

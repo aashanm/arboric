@@ -167,7 +167,7 @@ class GridWindow(BaseModel):
     renewable_percentage: float = Field(
         default=0, ge=0, le=100, description="Percentage of renewable sources"
     )
-    region: str = Field(default="US-WEST", description="Grid region identifier")
+    region: str = Field(default="eastus", description="Grid region identifier")
     confidence: float = Field(default=1.0, ge=0, le=1, description="Forecast confidence score")
 
     @property

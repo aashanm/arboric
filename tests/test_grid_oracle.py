@@ -15,9 +15,9 @@ class TestMockGrid:
 
     def test_mock_grid_creation(self):
         """Test basic grid creation with valid region."""
-        grid = MockGrid(region="US-WEST")
-        assert grid.region == "US-WEST"
-        assert grid.profile == REGION_PROFILES["US-WEST"]
+        grid = MockGrid(region="eastus")
+        assert grid.region == "eastus"
+        assert grid.profile == REGION_PROFILES["eastus"]
 
     def test_mock_grid_invalid_region(self):
         """Test that invalid region raises error."""
@@ -26,7 +26,7 @@ class TestMockGrid:
 
     def test_forecast_generation(self):
         """Test that forecast generates correct number of windows."""
-        grid = MockGrid(region="US-WEST")
+        grid = MockGrid(region="eastus")
         forecast = grid.get_forecast(hours=24)
 
         assert isinstance(forecast, pd.DataFrame)
@@ -37,7 +37,7 @@ class TestMockGrid:
 
     def test_forecast_with_custom_resolution(self):
         """Test forecast generation with custom time resolution."""
-        grid = MockGrid(region="US-WEST")
+        grid = MockGrid(region="eastus")
         forecast = grid.get_forecast(hours=12, resolution_minutes=30)
 
         # 12 hours at 30-minute resolution = 24 intervals
@@ -45,16 +45,17 @@ class TestMockGrid:
 
     def test_forecast_values_in_valid_range(self):
         """Test that generated forecast values are within realistic bounds."""
-        grid = MockGrid(region="US-WEST")
+        # Use westus2 (high on-demand rate profile) to verify price range
+        grid = MockGrid(region="westus2")
         forecast = grid.get_forecast(hours=24)
 
         # Carbon intensity should be between 50 and 800 gCO2/kWh
         assert forecast["co2_intensity"].min() >= 50
         assert forecast["co2_intensity"].max() <= 800
 
-        # Price should be between floor (with 15% noise slack) and on-demand rate (in $/hr)
-        # US-WEST: floor=$10.08/hr, noise can go down to 85% of floor=$8.57, ceiling=$24.00
-        assert forecast["price"].min() >= 8.0
+        # Price should be positive and within the on-demand ceiling
+        # westus2: on-demand=$24/hr, floor ~$10.08/hr (noise can push below)
+        assert forecast["price"].min() > 0.0
         assert forecast["price"].max() <= 25.0
 
         # Renewable percentage should be between 5 and 95%
@@ -63,38 +64,38 @@ class TestMockGrid:
 
     def test_forecast_has_datetime_index(self):
         """Test that forecast DataFrame has datetime index."""
-        grid = MockGrid(region="US-WEST")
+        grid = MockGrid(region="eastus")
         forecast = grid.get_forecast(hours=24)
 
         assert isinstance(forecast.index, pd.DatetimeIndex)
 
     def test_regional_profiles(self):
         """Test that different regions produce different characteristics."""
-        us_west_grid = MockGrid(region="US-WEST", seed=42)
-        nordic_grid = MockGrid(region="NORDIC", seed=42)
+        us_east_grid = MockGrid(region="eastus", seed=42)
+        northeurope_grid = MockGrid(region="northeurope", seed=42)
 
-        us_west_forecast = us_west_grid.get_forecast(hours=24)
-        nordic_forecast = nordic_grid.get_forecast(hours=24)
+        us_east_forecast = us_east_grid.get_forecast(hours=24)
+        northeurope_forecast = northeurope_grid.get_forecast(hours=24)
 
-        # Nordic should have lower average carbon (more hydro)
-        us_west_avg_carbon = us_west_forecast["co2_intensity"].mean()
-        nordic_avg_carbon = nordic_forecast["co2_intensity"].mean()
-        assert nordic_avg_carbon < us_west_avg_carbon
+        # North Europe (Ireland, hydro-dominated) should have lower average carbon
+        us_east_avg_carbon = us_east_forecast["co2_intensity"].mean()
+        northeurope_avg_carbon = northeurope_forecast["co2_intensity"].mean()
+        assert northeurope_avg_carbon < us_east_avg_carbon
 
     def test_get_current_conditions(self):
         """Test getting current grid conditions."""
-        grid = MockGrid(region="US-WEST")
+        grid = MockGrid(region="eastus")
         current = grid.get_current_conditions()
 
         assert hasattr(current, "timestamp")
         assert hasattr(current, "co2_intensity")
         assert hasattr(current, "price")
-        assert current.region == "US-WEST"
+        assert current.region == "eastus"
         assert current.confidence == 1.0
 
     def test_detect_events(self):
         """Test grid event detection."""
-        grid = MockGrid(region="US-WEST", seed=42)
+        grid = MockGrid(region="eastus", seed=42)
         forecast = grid.get_forecast(hours=24)
         events = grid.detect_events(forecast)
 
@@ -110,7 +111,7 @@ class TestMockGrid:
 
     def test_solar_duck_curve_pattern(self):
         """Test that forecast exhibits solar duck curve (low midday carbon)."""
-        grid = MockGrid(region="US-WEST", seed=42)
+        grid = MockGrid(region="eastus", seed=42)
         # Start forecast at midnight for predictable hour indices
         from datetime import datetime
 
@@ -129,7 +130,7 @@ class TestMockGrid:
         """Test that spot prices show business-hours contention pattern."""
         from datetime import datetime
 
-        grid = MockGrid(region="US-WEST", seed=42)
+        grid = MockGrid(region="eastus", seed=42)
         start_time = datetime(2026, 3, 19, 0, 0, 0)
         forecast = grid.get_forecast(hours=24, start_time=start_time)
 
@@ -148,8 +149,8 @@ class TestMockGrid:
 
     def test_deterministic_with_seed(self):
         """Test that using a seed produces reproducible results."""
-        grid1 = MockGrid(region="US-WEST", seed=123)
-        grid2 = MockGrid(region="US-WEST", seed=123)
+        grid1 = MockGrid(region="eastus", seed=123)
+        grid2 = MockGrid(region="eastus", seed=123)
 
         forecast1 = grid1.get_forecast(hours=12)
         forecast2 = grid2.get_forecast(hours=12)

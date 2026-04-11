@@ -25,7 +25,7 @@ def sample_workload_payload():
             "deadline_hours": 12.0,
             "workload_type": "ml_training",
         },
-        "region": "US-WEST",
+        "region": "eastus",
     }
 
 
@@ -47,5 +47,5 @@ def sample_fleet_payload():
                 "deadline_hours": 8.0,
             },
         ],
-        "region": "US-WEST",
+        "region": "eastus",
     }

@@ -45,7 +45,7 @@ class DefaultWorkloadSettings(BaseModel):
     duration_hours: float = Field(default=4.0, gt=0, description="Default workload duration")
     power_draw_kw: float = Field(default=50.0, gt=0, description="Default power draw in kW")
     deadline_hours: float = Field(default=12.0, gt=0, description="Default deadline in hours")
-    region: str = Field(default="US-WEST", description="Default grid region")
+    region: str = Field(default="eastus", description="Default grid region")
     instance_type: str | None = Field(
         default=None, description="Default cloud instance type (e.g. p3.8xlarge)"
     )
@@ -91,6 +91,23 @@ class HistorySettings(BaseModel):
     db_path: str = Field(default="~/.arboric/history.db", description="SQLite database path")
 
 
+class DashboardAuthSettings(BaseModel):
+    """Settings for dashboard login protection.
+
+    Add to ~/.arboric/config.yaml:
+        dashboard_auth:
+          password: mysecretpassword
+
+    Note: changing the password requires a server restart to take effect,
+    as the config is cached on first load.
+    """
+
+    password: str | None = Field(
+        default=None,
+        description="Password to access the web dashboard. If unset, dashboard is unprotected.",
+    )
+
+
 class ArboricConfig(BaseModel):
     """
     Main Arboric configuration model.
@@ -103,6 +120,7 @@ class ArboricConfig(BaseModel):
     live_data: LiveDataSettings = Field(default_factory=LiveDataSettings)
     cli: CLISettings = Field(default_factory=CLISettings)
     history: HistorySettings = Field(default_factory=HistorySettings)
+    dashboard_auth: DashboardAuthSettings = Field(default_factory=DashboardAuthSettings)
 
     @classmethod
     def get_config_path(cls) -> Path:

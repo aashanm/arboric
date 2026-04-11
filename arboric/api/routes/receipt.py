@@ -58,7 +58,7 @@ async def generate_receipt_endpoint(
         forecast_hours = request.forecast_hours or 48
         # Pass appropriate time based on grid type
         now_local = datetime.now().replace(minute=0, second=0, microsecond=0)
-        if type(grid).__name__ == "LiveGrid":
+        if getattr(grid, "is_live", False):
             now_for_forecast = now_local.astimezone(tz.utc).replace(tzinfo=None)
         else:
             now_for_forecast = now_local

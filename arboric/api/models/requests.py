@@ -37,7 +37,7 @@ class OptimizeRequest(BaseModel):
 
     workload: Workload = Field(..., description="Workload to optimize")
     region: str = Field(
-        default="US-WEST",
+        default="eastus",
         description="Grid region for optimization, or 'all' for cross-region comparison",
     )
     optimization_config: OptimizationConfigRequest | None = Field(
@@ -60,7 +60,7 @@ class FleetOptimizeRequest(BaseModel):
     workloads: list[Workload] = Field(
         ..., min_length=1, max_length=100, description="List of workloads to optimize (1-100)"
     )
-    region: str = Field(default="US-WEST", description="Grid region for optimization")
+    region: str = Field(default="eastus", description="Grid region for optimization")
     optimization_config: OptimizationConfigRequest | None = Field(
         None, description="Optional optimization configuration override"
     )

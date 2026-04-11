@@ -19,7 +19,7 @@ def test_forecast_default_params(client):
 
     # Check metadata
     metadata = result_data["metadata"]
-    assert metadata["region"] == "US-WEST"
+    assert metadata["region"] == "eastus"
     assert metadata["hours"] == 24
     assert metadata["data_points"] == 24
     assert metadata["resolution_minutes"] == 60
@@ -35,13 +35,13 @@ def test_forecast_default_params(client):
 
 def test_forecast_custom_region(client):
     """Test forecast with custom region."""
-    response = client.get("/api/v1/forecast?region=EU-WEST")
+    response = client.get("/api/v1/forecast?region=uksouth")
 
     assert response.status_code == 200
     data = response.json()
 
     metadata = data["data"]["metadata"]
-    assert metadata["region"] == "EU-WEST"
+    assert metadata["region"] == "uksouth"
 
 
 def test_forecast_custom_hours(client):
@@ -77,7 +77,7 @@ def test_forecast_invalid_hours_too_high(client):
 
 def test_forecast_all_supported_regions(client):
     """Test forecast for all supported regions."""
-    regions = ["US-WEST", "US-EAST", "EU-WEST", "NORDIC"]
+    regions = ["eastus", "westus2", "uksouth", "northeurope"]
 
     for region in regions:
         response = client.get(f"/api/v1/forecast?region={region}")

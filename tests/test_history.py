@@ -49,18 +49,18 @@ class TestHistoryStore:
 
     def test_record_inserts_row(self, temp_history_db, sample_result):
         """Test that record() inserts a row."""
-        temp_history_db.record(sample_result, region="US-WEST", data_source="mockgrid")
+        temp_history_db.record(sample_result, region="eastus", data_source="mockgrid")
 
         rows = temp_history_db.query(limit=100)
         assert len(rows) == 1
         assert rows[0]["workload_name"] == "Test Job"
-        assert rows[0]["region"] == "US-WEST"
+        assert rows[0]["region"] == "eastus"
         assert rows[0]["data_source"] == "mockgrid"
 
     def test_query_returns_newest_first(self, temp_history_db, sample_result):
         """Test that query() returns rows newest first."""
         # Insert 3 jobs with different UUIDs and names
-        temp_history_db.record(sample_result, region="US-WEST")
+        temp_history_db.record(sample_result, region="eastus")
 
         # Create new workload with different UUID and name
         result2 = ScheduleResult(
@@ -84,7 +84,7 @@ class TestHistoryStore:
             baseline_avg_price=sample_result.baseline_avg_price,
             baseline_avg_carbon=sample_result.baseline_avg_carbon,
         )
-        temp_history_db.record(result2, region="US-WEST")
+        temp_history_db.record(result2, region="eastus")
 
         result3 = ScheduleResult(
             workload=Workload(
@@ -107,7 +107,7 @@ class TestHistoryStore:
             baseline_avg_price=sample_result.baseline_avg_price,
             baseline_avg_carbon=sample_result.baseline_avg_carbon,
         )
-        temp_history_db.record(result3, region="US-WEST")
+        temp_history_db.record(result3, region="eastus")
 
         rows = temp_history_db.query(limit=100)
         assert len(rows) == 3
@@ -140,14 +140,14 @@ class TestHistoryStore:
                 baseline_avg_price=sample_result.baseline_avg_price,
                 baseline_avg_carbon=sample_result.baseline_avg_carbon,
             )
-            temp_history_db.record(result, region="US-WEST")
+            temp_history_db.record(result, region="eastus")
 
         rows = temp_history_db.query(limit=5)
         assert len(rows) == 5
 
     def test_query_filters_by_region(self, temp_history_db, sample_result):
         """Test that query() filters by region."""
-        temp_history_db.record(sample_result, region="US-WEST")
+        temp_history_db.record(sample_result, region="eastus")
 
         # Create new result with different UUID
         result2 = ScheduleResult(
@@ -171,10 +171,10 @@ class TestHistoryStore:
             baseline_avg_price=sample_result.baseline_avg_price,
             baseline_avg_carbon=sample_result.baseline_avg_carbon,
         )
-        temp_history_db.record(result2, region="US-EAST")
+        temp_history_db.record(result2, region="westus2")
 
-        rows_west = temp_history_db.query(region="US-WEST")
-        rows_east = temp_history_db.query(region="US-EAST")
+        rows_west = temp_history_db.query(region="eastus")
+        rows_east = temp_history_db.query(region="westus2")
 
         assert len(rows_west) == 1
         assert rows_west[0]["workload_name"] == "Test Job"
@@ -185,7 +185,7 @@ class TestHistoryStore:
     def test_query_filters_by_since_days(self, temp_history_db, sample_result):
         """Test that query() filters by since_days."""
         # Insert one run now
-        temp_history_db.record(sample_result, region="US-WEST")
+        temp_history_db.record(sample_result, region="eastus")
 
         # Query for last 1 day — should return 1
         rows = temp_history_db.query(since_days=1)
@@ -197,7 +197,7 @@ class TestHistoryStore:
 
     def test_aggregate_computes_totals(self, temp_history_db, sample_result):
         """Test that aggregate() computes correct totals."""
-        temp_history_db.record(sample_result, region="US-WEST")
+        temp_history_db.record(sample_result, region="eastus")
 
         # Create second result with different UUID
         result2 = ScheduleResult(
@@ -221,7 +221,7 @@ class TestHistoryStore:
             baseline_avg_price=sample_result.baseline_avg_price,
             baseline_avg_carbon=sample_result.baseline_avg_carbon,
         )
-        temp_history_db.record(result2, region="US-WEST")
+        temp_history_db.record(result2, region="eastus")
 
         agg = temp_history_db.aggregate()
 
@@ -243,32 +243,32 @@ class TestHistoryStore:
 
     def test_aggregate_finds_best_region(self, temp_history_db, sample_result):
         """Test that aggregate() identifies best region."""
-        # Insert 3 in US-WEST, 1 in US-EAST
+        # Insert 3 in eastus, 1 in westus2
         for _ in range(3):
-            temp_history_db.record(sample_result, region="US-WEST")
+            temp_history_db.record(sample_result, region="eastus")
 
         sample_result.workload.name = "East Job"
-        temp_history_db.record(sample_result, region="US-EAST")
+        temp_history_db.record(sample_result, region="westus2")
 
         agg = temp_history_db.aggregate()
-        assert agg["best_region"] == "US-WEST"
+        assert agg["best_region"] == "eastus"
 
     def test_aggregate_finds_top_workload(self, temp_history_db, sample_result):
         """Test that aggregate() identifies top workload."""
         # Insert 2 "Training" and 1 "Pipeline"
         sample_result.workload.name = "LLM Training"
-        temp_history_db.record(sample_result, region="US-WEST")
-        temp_history_db.record(sample_result, region="US-WEST")
+        temp_history_db.record(sample_result, region="eastus")
+        temp_history_db.record(sample_result, region="eastus")
 
         sample_result.workload.name = "ETL Pipeline"
-        temp_history_db.record(sample_result, region="US-WEST")
+        temp_history_db.record(sample_result, region="eastus")
 
         agg = temp_history_db.aggregate()
         assert agg["top_workload"] == "LLM Training"
 
     def test_clear_deletes_all_rows(self, temp_history_db, sample_result):
         """Test that clear() deletes all history."""
-        temp_history_db.record(sample_result, region="US-WEST")
+        temp_history_db.record(sample_result, region="eastus")
 
         # Create second result with different UUID
         result2 = ScheduleResult(
@@ -292,7 +292,7 @@ class TestHistoryStore:
             baseline_avg_price=sample_result.baseline_avg_price,
             baseline_avg_carbon=sample_result.baseline_avg_carbon,
         )
-        temp_history_db.record(result2, region="US-WEST")
+        temp_history_db.record(result2, region="eastus")
 
         rows = temp_history_db.query(limit=100)
         assert len(rows) == 2
@@ -308,13 +308,13 @@ class TestHistoryStore:
         store = HistoryStore(Path("/nonexistent/path/history.db"))
 
         # Should not raise an exception
-        store.record(sample_result, region="US-WEST")
+        store.record(sample_result, region="eastus")
 
     def test_duplicate_ids_are_ignored(self, temp_history_db, sample_result):
         """Test that duplicate IDs don't insert duplicate rows."""
         # Insert same result twice (same UUID)
-        temp_history_db.record(sample_result, region="US-WEST")
-        temp_history_db.record(sample_result, region="US-WEST")
+        temp_history_db.record(sample_result, region="eastus")
+        temp_history_db.record(sample_result, region="eastus")
 
         rows = temp_history_db.query(limit=100)
         # Should only have 1 row due to PRIMARY KEY constraint

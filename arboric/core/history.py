@@ -83,7 +83,7 @@ class HistoryStore:
 
         Args:
             result: ScheduleResult from autopilot
-            region: Grid region (US-WEST, US-EAST, etc)
+            region: Grid region (eastus, westus2, etc)
             data_source: 'mockgrid' or 'live'
         """
         try:

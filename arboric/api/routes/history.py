@@ -23,7 +23,7 @@ router = APIRouter()
 async def get_history(
     limit: int = Query(20, ge=1, le=500, description="Max results"),
     since_days: int | None = Query(30, description="Days to look back (None = all time)"),
-    region: str | None = Query(None, description="Filter by region (US-WEST, US-EAST, etc)"),
+    region: str | None = Query(None, description="Filter by region (eastus, westus2, etc)"),
     config: ArboricConfig = Depends(get_arboric_config),
 ):
     """

@@ -54,8 +54,18 @@ def _slice_forecast_to_window(
     Returns:
         List of HourlyMOEREntry objects, one per hour in the window.
     """
+
+    # Normalize datetimes to match the DataFrame index's tz-awareness
+    def _strip_tz(dt):
+        return dt.replace(tzinfo=None) if hasattr(dt, "tzinfo") and dt.tzinfo is not None else dt
+
+    if hasattr(forecast_df.index, "tzinfo") and forecast_df.index.tzinfo is None:
+        s, e = _strip_tz(optimal_start), _strip_tz(optimal_end)
+    else:
+        s, e = optimal_start, optimal_end
+
     # Slice to the optimal window
-    window = forecast_df[(forecast_df.index >= optimal_start) & (forecast_df.index < optimal_end)]
+    window = forecast_df[(forecast_df.index >= s) & (forecast_df.index < e)]
 
     entries = []
     for timestamp, row in window.iterrows():
@@ -67,7 +77,7 @@ def _slice_forecast_to_window(
             co2_intensity=float(row["co2_intensity"]),
             marginal_price=float(row["price"]),
             renewable_percentage=float(row.get("renewable_percentage", 0.0)),
-            region=str(row.get("region", "US-WEST")),
+            region=str(row.get("region", "eastus")),
             confidence=float(row.get("confidence", 1.0)),
             carbon_kg_for_hour=carbon_kg_for_hour,
             cost_for_hour=cost_for_hour,
