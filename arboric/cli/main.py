@@ -434,6 +434,16 @@ def optimize(
     cloud_provider = cloud_provider if cloud_provider is not None else cfg.defaults.cloud_provider
     quiet = quiet or cfg.cli.quiet_mode
 
+    # Normalize legacy region aliases to Azure ARM IDs
+    _region_aliases = {
+        "us-west": "westus2",
+        "us-east": "eastus",
+        "eu-west": "uksouth",
+        "nordic": "northeurope",
+    }
+    if region and region.lower() in _region_aliases:
+        region = _region_aliases[region.lower()]
+
     if not quiet and cfg.cli.show_banner:
         print_banner()
         console.print()
@@ -529,8 +539,8 @@ def optimize(
     from datetime import timezone as tz
 
     now_local = datetime.now().replace(minute=0, second=0, microsecond=0)
-    if type(grid).__name__ == "LiveGrid":
-        # LiveGrid interprets naive datetime as UTC
+    if getattr(grid, "is_live", False):
+        # Live grid interprets naive datetime as UTC
         now_for_forecast = now_local.astimezone(tz.utc).replace(tzinfo=None)
     else:
         # MockGrid expects naive local time
@@ -560,7 +570,7 @@ def optimize(
 
         try:
             store = HistoryStore(Path(cfg.history.db_path).expanduser())
-            data_source = "live" if type(grid).__name__ == "LiveGrid" else "mockgrid"
+            data_source = "live" if getattr(grid, "is_live", False) else "mockgrid"
             store.record(result, region=region, data_source=data_source)
         except Exception as e:
             # Gracefully handle history db failures (e.g., in CI/GitHub Actions)
@@ -728,6 +738,16 @@ def tradeoff(
     cloud_provider = cloud_provider if cloud_provider is not None else cfg.defaults.cloud_provider
     quiet = quiet or cfg.cli.quiet_mode
 
+    # Normalize legacy region aliases to Azure ARM IDs
+    _region_aliases = {
+        "us-west": "westus2",
+        "us-east": "eastus",
+        "eu-west": "uksouth",
+        "nordic": "northeurope",
+    }
+    if region and region.lower() in _region_aliases:
+        region = _region_aliases[region.lower()]
+
     if not quiet and cfg.cli.show_banner:
         print_banner()
         console.print()
@@ -771,7 +791,7 @@ def tradeoff(
     from datetime import timezone as tz
 
     now_local = datetime.now().replace(minute=0, second=0, microsecond=0)
-    if type(grid).__name__ == "LiveGrid":
+    if getattr(grid, "is_live", False):
         now_for_forecast = now_local.astimezone(tz.utc).replace(tzinfo=None)
     else:
         now_for_forecast = now_local
@@ -904,7 +924,7 @@ Simulating intelligent scheduling for [bold]{len(demo_workloads)}[/bold] heavy c
 The autopilot will analyze grid conditions and optimize each job for
 minimum cost and carbon emissions.
 
-[dim]Region: US-WEST  |  Forecast Horizon: 24h  |  Optimization: 70% cost / 30% carbon[/dim]""",
+[dim]Region: eastus  |  Forecast Horizon: 24h  |  Optimization: 70% cost / 30% carbon[/dim]""",
         border_style=ARBORIC_PURPLE,
         padding=(1, 2),
     )
@@ -943,7 +963,7 @@ minimum cost and carbon emissions.
 
     demo_start = datetime.now().replace(hour=18, minute=0, second=0, microsecond=0)
 
-    grid = MockGrid(region="US-WEST", seed=42)  # Fixed seed for consistent demo results
+    grid = MockGrid(region="eastus", seed=42)  # Fixed seed for consistent demo results
     forecast = grid.get_forecast(hours=48, start_time=demo_start)  # Extended forecast
     autopilot = Autopilot()
 
@@ -1129,7 +1149,7 @@ minimum cost and carbon emissions.
 
 @app.command()
 def forecast(
-    region: str = typer.Option("US-WEST", "--region", "-r", help="Grid region"),
+    region: str = typer.Option("eastus", "--region", "-r", help="Grid region"),
     hours: int = typer.Option(24, "--hours", "-h", help="Forecast hours"),
     instance_type: str | None = typer.Option(
         None, "--instance-type", help="Cloud instance type (optional, affects spot pricing)"
@@ -1147,7 +1167,7 @@ def forecast(
 
     Shows carbon intensity and pricing over the forecast horizon.
 
-    Export forecast: arboric forecast --output forecast.csv --region US-WEST --hours 24
+    Export forecast: arboric forecast --output forecast.csv --region eastus --hours 24
     """
     print_banner()
     console.print()
@@ -1163,7 +1183,7 @@ def forecast(
     from datetime import timezone as tz
 
     now_local = datetime.now().replace(minute=0, second=0, microsecond=0)
-    if type(grid).__name__ == "LiveGrid":
+    if getattr(grid, "is_live", False):
         now_for_forecast = now_local.astimezone(tz.utc).replace(tzinfo=None)
     else:
         now_for_forecast = now_local
@@ -1290,10 +1310,9 @@ def status():
     from arboric.core.grid_oracle import get_grid
 
     config = get_config()
-    grid = get_grid(region="US-WEST", config=config)
-    grid_type = type(grid).__name__
-    mode = "live" if isinstance(grid, type(grid)) and grid_type == "LiveGrid" else "simulation"
-    grid_details = f"{grid_type} ({mode} mode)"
+    grid = get_grid(region="eastus", config=config)
+    mode = "live" if getattr(grid, "is_live", False) else "simulation"
+    grid_details = f"Grid ({mode} mode)"
 
     status_table = Table(
         title="[bold]System Status",
@@ -1513,7 +1532,7 @@ def history(
     View historical optimization runs and ROI metrics.
 
     Example: arboric history
-    Example: arboric history --limit 10 --since 7d --region US-WEST
+    Example: arboric history --limit 10 --since 7d --region eastus
     Example: arboric history --format json
     """
     from pathlib import Path
@@ -1585,7 +1604,7 @@ def insights(
     View ROI insights and savings summary.
 
     Example: arboric insights
-    Example: arboric insights --period 90d --region US-WEST
+    Example: arboric insights --period 90d --region eastus
     Example: arboric insights --format json
     """
     from pathlib import Path

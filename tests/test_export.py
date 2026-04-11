@@ -281,7 +281,7 @@ class TestForecastExport:
             "co2_intensity": [300.0 + i * 10 for i in range(hours)],
             "price": [0.10 + i * 0.01 for i in range(hours)],
             "renewable_percentage": [50.0] * hours,
-            "region": ["US-WEST"] * hours,
+            "region": ["eastus"] * hours,
             "confidence": [1.0] * hours,
         }
 
@@ -292,14 +292,14 @@ class TestForecastExport:
     def test_export_forecast_json(self, sample_forecast, tmp_path):
         """Test forecast JSON export includes metadata."""
         output_file = tmp_path / "forecast.json"
-        export_forecast(sample_forecast, "US-WEST", 24, output_file, ExportFormat.JSON)
+        export_forecast(sample_forecast, "eastus", 24, output_file, ExportFormat.JSON)
 
         with open(output_file) as f:
             data = json.load(f)
 
         assert data["command"] == "forecast"
         assert "metadata" in data
-        assert data["metadata"]["region"] == "US-WEST"
+        assert data["metadata"]["region"] == "eastus"
         assert data["metadata"]["hours"] == 24
         assert data["metadata"]["data_points"] == 24
 
@@ -311,7 +311,7 @@ class TestForecastExport:
     def test_export_forecast_csv(self, sample_forecast, tmp_path):
         """Test forecast CSV export."""
         output_file = tmp_path / "forecast.csv"
-        export_forecast(sample_forecast, "US-WEST", 24, output_file, ExportFormat.CSV)
+        export_forecast(sample_forecast, "eastus", 24, output_file, ExportFormat.CSV)
 
         # Load and verify
         df = pd.read_csv(output_file, index_col=0, parse_dates=True)

@@ -16,7 +16,7 @@ router = APIRouter()
 
 @router.get("/forecast")
 async def get_forecast(
-    region: str = Query(default="US-WEST", description="Grid region"),
+    region: str = Query(default="eastus", description="Grid region"),
     hours: int = Query(default=24, ge=1, le=168, description="Forecast hours (1-168)"),
 ):
     """
@@ -26,7 +26,7 @@ async def get_forecast(
     renewable percentage, and confidence scores.
 
     Args:
-        region: Grid region (US-WEST, US-EAST, EU-WEST, NORDIC)
+        region: Grid region (eastus, westus2, uksouth, northeurope)
         hours: Number of forecast hours (1-168)
 
     Returns:
@@ -40,7 +40,7 @@ async def get_forecast(
         grid = get_grid(region=region, config=get_config())
         # Pass appropriate time based on grid type
         now_local = datetime.now().replace(minute=0, second=0, microsecond=0)
-        if type(grid).__name__ == "LiveGrid":
+        if getattr(grid, "is_live", False):
             now_for_forecast = now_local.astimezone(tz.utc).replace(tzinfo=None)
         else:
             now_for_forecast = now_local

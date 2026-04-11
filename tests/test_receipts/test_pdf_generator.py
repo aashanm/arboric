@@ -200,7 +200,7 @@ def test_generate_receipt_pdf_with_24_hourly_entries():
             co2_intensity=300.0 + (hour % 6) * 50,  # Vary 300-550
             marginal_price=0.08 + (hour % 4) * 0.05,
             renewable_percentage=30.0 + (hour % 8) * 8,  # Vary 30-86%
-            region="US-WEST",
+            region="eastus",
             confidence=0.9,
             carbon_kg_for_hour=30.0 + (hour % 6) * 5,
             cost_for_hour=0.8 + (hour % 4) * 0.5,

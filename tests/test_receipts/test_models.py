@@ -16,7 +16,7 @@ def test_hourly_moer_entry_construction():
         co2_intensity=450.0,
         marginal_price=0.12,
         renewable_percentage=65.0,
-        region="US-WEST",
+        region="eastus",
         confidence=0.95,
         carbon_kg_for_hour=54.0,
         cost_for_hour=1.44,
@@ -26,7 +26,7 @@ def test_hourly_moer_entry_construction():
     assert entry.co2_intensity == 450.0
     assert entry.marginal_price == 0.12
     assert entry.renewable_percentage == 65.0
-    assert entry.region == "US-WEST"
+    assert entry.region == "eastus"
     assert entry.confidence == 0.95
     assert entry.carbon_kg_for_hour == 54.0
     assert entry.cost_for_hour == 1.44

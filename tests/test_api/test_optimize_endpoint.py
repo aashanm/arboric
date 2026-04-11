@@ -62,7 +62,7 @@ def test_optimize_with_custom_config(client):
             "power_draw_kw": 30.0,
             "deadline_hours": 12.0,
         },
-        "region": "US-EAST",
+        "region": "westus2",
         "optimization_config": {"cost_weight": 0.8, "carbon_weight": 0.2},
     }
 

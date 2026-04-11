@@ -123,7 +123,7 @@ def render_receipt_html(receipt: CarbonReceipt) -> str:
         generated_at=_to_local_time(receipt.generated_at).strftime("%Y-%m-%d %H:%M"),
         workload_type=receipt.workload.workload_type.value,
         power_draw_kw=receipt.workload.power_draw_kw,
-        region=receipt.hourly_moer[0].region if receipt.hourly_moer else "US-WEST",
+        region=receipt.hourly_moer[0].region if receipt.hourly_moer else "eastus",
         cost_savings_percent=receipt.cost_savings_percent,
         carbon_savings_percent=receipt.carbon_savings_percent,
         baseline_cost=receipt.baseline_cost,

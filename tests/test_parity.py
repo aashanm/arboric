@@ -162,7 +162,7 @@ def parity_forecast():
         "price": [0.10 + 0.05 * abs((i - 12) % 24) / 12 for i in range(hours)],
         "co2_intensity": [300 + 100 * abs((i - 12) % 24) / 12 for i in range(hours)],
         "renewable_percentage": [50.0] * hours,
-        "region": ["US-WEST"] * hours,
+        "region": ["eastus"] * hours,
         "confidence": [1.0] * hours,
     }
     df = pd.DataFrame(data)
@@ -328,7 +328,7 @@ class TestParityOptimization:
             "price": [0.10 + 0.05 * abs((i - 12) % 24) / 12 for i in range(extended_hours)],
             "co2_intensity": [300 + 100 * abs((i - 12) % 24) / 12 for i in range(extended_hours)],
             "renewable_percentage": [50.0] * extended_hours,
-            "region": ["US-WEST"] * extended_hours,
+            "region": ["eastus"] * extended_hours,
             "confidence": [1.0] * extended_hours,
         }
         extended_df = pd.DataFrame(extended_data).set_index("timestamp")
@@ -369,7 +369,7 @@ class TestParityOptimization:
             "price": [0.12] * 48,  # Flat price
             "co2_intensity": [350.0] * 48,  # Flat carbon
             "renewable_percentage": [50.0] * 48,
-            "region": ["US-WEST"] * 48,
+            "region": ["eastus"] * 48,
             "confidence": [1.0] * 48,
         }
         flat_df = pd.DataFrame(flat_data).set_index("timestamp")
@@ -505,7 +505,7 @@ class TestParityEdgeCases:
             "price": [0.05] * 48,  # Well below $35 ceiling
             "co2_intensity": [200.0] * 48,
             "renewable_percentage": [50.0] * 48,
-            "region": ["US-WEST"] * 48,
+            "region": ["eastus"] * 48,
             "confidence": [1.0] * 48,
         }
         cheap_df = pd.DataFrame(cheap_data).set_index("timestamp")
@@ -543,7 +543,7 @@ class TestParityEdgeCases:
             "price": [0.15] * 48,
             "co2_intensity": [1000.0] * 48,  # Well above 600 ceiling
             "renewable_percentage": [50.0] * 48,
-            "region": ["US-WEST"] * 48,
+            "region": ["eastus"] * 48,
             "confidence": [1.0] * 48,
         }
         dirty_df = pd.DataFrame(dirty_data).set_index("timestamp")

@@ -63,7 +63,7 @@ async def get_status(config: ArboricConfig = Depends(get_arboric_config)):
                 "data_sources": data_sources,
             },
             "autopilot": {"status": "ready", "version": "1.0.0"},
-            "supported_regions": ["US-WEST", "US-EAST", "EU-WEST", "NORDIC"],
+            "supported_regions": ["eastus", "westus2", "uksouth", "northeurope"],
         },
         "configuration": {
             "default_cost_weight": config.optimization.cost_weight,

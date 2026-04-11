@@ -461,6 +461,43 @@ ruff format arboric
 
 ---
 
+## Running the Scheduler
+
+The Arboric Scheduler holds compute jobs until the optimal Azure region and time window, dispatches them, and generates a signed compliance receipt.
+
+**Setup:**
+
+```bash
+# 1. Install with scheduler extras (includes playwright, jinja2, cryptography)
+pip install arboric[scheduler]
+playwright install chromium
+
+# 2. Start the API server
+ARBORIC_API_KEY=any-string arboric api --host 0.0.0.0 --port 8000
+
+# 3. Expose publicly (for GitHub Actions)
+ngrok http 8000   # copy the https:// URL
+
+# 4. Add secrets to your GitHub repository:
+#    ARBORIC_API_URL = https://xxxx.ngrok.io
+#    ARBORIC_API_KEY = any-string
+```
+
+**Open the dashboard:** http://localhost:8000/dashboard
+
+**Submit a job manually:**
+
+```bash
+curl -X POST localhost:8000/api/v1/jobs \
+  -H "X-Arboric-Api-Key: any-string" \
+  -H "Content-Type: application/json" \
+  -d '{"job_name":"Test Run","duration_hours":4,"deadline_hours":18,"power_draw_kw":8.0}'
+```
+
+Then click ⚡ Fast-forward in the dashboard to optimize across 4 Azure regions, watch the 15s dispatch simulation, and download the signed PDF receipt.
+
+---
+
 ## 📄 License
 
 Arboric is released under the [MIT License](LICENSE).

@@ -25,7 +25,7 @@ from arboric.core.models import GridWindow
 # Carbon fields: model electricity grid generation mix (solar duck curve, evening peaker ramps)
 # Pricing fields: model cloud spot instance rates (business-hours capacity contention)
 REGION_PROFILES = {
-    "US-WEST": {
+    "westus2": {
         # Carbon (unchanged from original - still models grid generation mix)
         "base_carbon": 350,  # gCO2/kWh
         "carbon_amplitude": 200,  # Swing from solar duck curve
@@ -36,8 +36,9 @@ REGION_PROFILES = {
         "spot_peak_discount": 0.25,  # 25% off = $18.00/hr peak (business hours)
         "contention_peak_hour": 14,  # 2 PM PT - peak ML batch job submission
         "timezone_offset": -8,
+        "azure_display": "West US 2",
     },
-    "US-EAST": {
+    "eastus": {
         "base_carbon": 420,
         "carbon_amplitude": 150,
         "solar_peak_hour": 13,
@@ -46,26 +47,29 @@ REGION_PROFILES = {
         "spot_peak_discount": 0.20,
         "contention_peak_hour": 14,  # 2 PM ET - peak ML batch job submission
         "timezone_offset": -5,
+        "azure_display": "East US",
     },
-    "EU-WEST": {
+    "uksouth": {
         "base_carbon": 280,
         "carbon_amplitude": 180,
         "solar_peak_hour": 14,
         "on_demand_rate_per_hr": 20.00,
         "spot_floor_discount": 0.50,  # → floor=$10.00/hr, peak=$17.00/hr
         "spot_peak_discount": 0.15,
-        "contention_peak_hour": 13,  # 1 PM CET - peak ML batch job submission
+        "contention_peak_hour": 13,  # 1 PM GMT - peak ML batch job submission
         "timezone_offset": 1,
+        "azure_display": "UK South",
     },
-    "NORDIC": {
-        "base_carbon": 80,  # Hydro-dominated
+    "northeurope": {
+        "base_carbon": 80,  # Hydro-dominated (Ireland grid)
         "carbon_amplitude": 40,
         "solar_peak_hour": 13,
         "on_demand_rate_per_hr": 18.00,
         "spot_floor_discount": 0.60,  # → floor=$7.20/hr, peak=$12.60/hr
         "spot_peak_discount": 0.30,
-        "contention_peak_hour": 13,  # 1 PM CET - peak ML batch job submission
+        "contention_peak_hour": 13,  # 1 PM GMT - peak ML batch job submission
         "timezone_offset": 1,
+        "azure_display": "North Europe",
     },
 }
 
@@ -236,7 +240,7 @@ class MockGrid:
 
     def __init__(
         self,
-        region: str = "US-WEST",
+        region: str = "eastus",
         instance_type: str | None = None,
         cloud_provider: str | None = None,
         seed: int | None = None,
@@ -245,12 +249,12 @@ class MockGrid:
         Initialize the grid simulator.
 
         Args:
-            region: Grid region identifier (US-WEST, US-EAST, EU-WEST, NORDIC)
+            region: Azure region identifier (eastus, westus2, uksouth, northeurope)
             instance_type: Cloud instance type (e.g., 'p3.8xlarge'). Use with cloud_provider.
             cloud_provider: Cloud provider ('aws', 'gcp', 'azure'). Use with instance_type.
             seed: Random seed for reproducible forecasts (None for varied demos)
         """
-        self.region = region.upper()
+        self.region = region.lower()
         if self.region not in REGION_PROFILES:
             raise ValueError(
                 f"Unknown region: {self.region}. Available: {list(REGION_PROFILES.keys())}"
@@ -406,7 +410,7 @@ class MockGrid:
         wind = wind_base + 10 * math.cos(2 * math.pi * (hour - 4) / 24)  # Peaks around 4am
 
         # Base hydro/nuclear (constant)
-        base_renewable = 10 if self.region != "NORDIC" else 60
+        base_renewable = 10 if self.region != "northeurope" else 60
 
         total = base_renewable + solar + max(0, wind)
         return min(95, max(5, total + self._random.gauss(0, 3)))
@@ -558,7 +562,7 @@ class MockGrid:
 
 
 def get_grid(
-    region: str = "US-WEST",
+    region: str = "eastus",
     config=None,
     seed: int | None = None,
     instance_type: str | None = None,
@@ -570,7 +574,7 @@ def get_grid(
     otherwise returns MockGrid (pure simulation, always available).
 
     Args:
-        region: Grid region identifier
+        region: Azure region identifier (eastus, westus2, uksouth, northeurope)
         config: Optional ArboricConfig instance (loaded from file if None)
         seed: Optional random seed. If None and using MockGrid, seeds based on current date
               for reproducibility within a day.
@@ -581,8 +585,8 @@ def get_grid(
     Returns:
         Grid provider instance (LiveGrid or MockGrid)
     """
-    # Normalize region to uppercase
-    region = region.upper()
+    # Normalize region to lowercase (Azure region names are lowercase)
+    region = region.lower()
 
     if config is None:
         from arboric.core.config import get_config
