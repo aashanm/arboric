@@ -70,6 +70,7 @@ def serialize_schedule_for_api(
 
     return {
         "region": region or "unknown",
+        "on_demand_rate_per_hr": result.on_demand_rate_per_hr,
         "workload": data["workload"],
         "optimization": {
             "optimal_start": data["optimal_start"],

@@ -81,6 +81,29 @@ try:
     app.include_router(dashboard_route.router, tags=["Dashboard"])
 
     @app.on_event("startup")
+    async def _start_recurrence_scheduler() -> None:
+        """Start APScheduler recurring job service."""
+        try:
+            from arboric_cloud.scheduler.recurrence import init_scheduler
+
+            from arboric.api.dependencies import get_arboric_config
+
+            config_obj = get_arboric_config()
+            init_scheduler(config_obj)
+        except Exception as exc:
+            logger.warning("Recurring scheduler startup skipped: %s", exc)
+
+    @app.on_event("shutdown")
+    async def _stop_recurrence_scheduler() -> None:
+        """Shut down APScheduler gracefully."""
+        try:
+            from arboric_cloud.scheduler.recurrence import shutdown
+
+            shutdown()
+        except Exception:
+            pass
+
+    @app.on_event("startup")
     async def _repair_missing_receipts() -> None:
         """Auto-regenerate receipts for COMPLETE jobs that are missing a PDF."""
         try:
