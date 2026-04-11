@@ -375,7 +375,7 @@
       const baselineSlice = forecast.slice(0, windowsNeeded);
       const baselineAvgPrice = baselineSlice.reduce((s, w) => s + w.price, 0) / baselineSlice.length;
       const baselineAvgCarbon = baselineSlice.reduce((s, w) => s + w.co2_intensity, 0) / baselineSlice.length;
-      const baselineCost = baselineAvgPrice * durationHours;
+      const baselineCost = instanceProfile.on_demand * durationHours;
       const baselineCarbonKg = (baselineAvgCarbon * energyKwh) / 1000;
 
       function scoreWindow(slice) {
